@@ -1,0 +1,1866 @@
+openapi: 3.0.3
+info:
+  title: Tracking Order API
+  description: |
+    API specification cho hệ thống Tracking Order — bao gồm 13 màn hình:
+    Storefront, Cart, Order Management, Tracking, Returns, Shipper App,
+    Product CMS, Shipping Config, Admin Dashboard, Authentication.
+  version: 1.0.0
+  contact:
+    name: Dev Team
+    email: dev@tracking-order.vn
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local Development
+  - url: https://api.tracking-order.vn/api/v1
+    description: Production
+
+tags:
+  - name: Auth
+    description: Đăng nhập / Đăng ký - Đa phân quyền (Màn hình 5)
+  - name: Cart
+    description: Giỏ hàng & Kiểm tra tồn kho (Màn hình 1)
+  - name: Orders
+    description: Quản lý đơn hàng - Admin/Customer (Màn hình 4, 7, 11)
+  - name: Tracking
+    description: Theo dõi hành trình đơn hàng (Màn hình 3)
+  - name: Returns
+    description: Quản lý Trả hàng (Màn hình 2)
+  - name: Shipper
+    description: Xác nhận giao/nhận & Cập nhật trạng thái (Màn hình 8, 13)
+  - name: Products
+    description: Storefront, Product Detail, Product CMS (Màn hình 9, 10, 6)
+  - name: Reviews
+    description: Đánh giá sản phẩm (Màn hình 10)
+  - name: Shipping
+    description: Cấu hình Vận chuyển & Carrier (Màn hình 12)
+  - name: Admin
+    description: Admin Dashboard Stats (Màn hình 4)
+  - name: Newsletter
+    description: Đăng ký nhận tin (Màn hình 9)
+  - name: Notifications
+    description: Thông báo hệ thống
+
+# ============================================================
+# SECURITY
+# ============================================================
+securitySchemes: {}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  # ============================================================
+  # SCHEMAS
+  # ============================================================
+  schemas:
+
+    # ---------- AUTH ----------
+    LoginRequest:
+      type: object
+      required: [email, password, role]
+      properties:
+        email:
+          type: string
+          format: email
+          example: admin@company.vn
+        password:
+          type: string
+          format: password
+          example: "P@ssw0rd"
+        role:
+          type: string
+          enum: [customer, shipper, admin]
+          example: admin
+        rememberMe:
+          type: boolean
+          default: false
+
+    LoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: '#/components/schemas/UserInfo'
+
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "usr_001"
+        name:
+          type: string
+          example: "Nguyễn Văn A"
+        email:
+          type: string
+        role:
+          type: string
+          enum: [customer, shipper, admin]
+        avatarUrl:
+          type: string
+          format: uri
+
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    # ---------- CART ----------
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: string
+        productId:
+          type: string
+        name:
+          type: string
+          example: "Industrial Hardware"
+        imageUrl:
+          type: string
+          format: uri
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: number
+          format: double
+        totalPrice:
+          type: number
+          format: double
+        inventoryStatus:
+          type: string
+          enum: [in_stock, limited, out_of_stock]
+        stockQuantity:
+          type: integer
+
+    CartResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        subtotal:
+          type: number
+          format: double
+        shippingFee:
+          type: number
+          format: double
+        discount:
+          type: number
+          format: double
+        total:
+          type: number
+          format: double
+        hasOutOfStockItems:
+          type: boolean
+        errorMessage:
+          type: string
+          nullable: true
+
+    UpdateCartItemRequest:
+      type: object
+      required: [quantity]
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+
+    CheckoutResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          example: "ORD-9921-X"
+        message:
+          type: string
+          example: "Đặt hàng thành công"
+
+    # ---------- ORDERS ----------
+    OrderStatus:
+      type: string
+      enum:
+        - pending
+        - confirmed
+        - picking
+        - shipping
+        - delivered
+        - cancelled
+        - failed
+
+    OrderSummary:
+      type: object
+      properties:
+        orderId:
+          type: string
+          example: "ORD-9921-X"
+        createdAt:
+          type: string
+          format: date-time
+        customer:
+          type: object
+          properties:
+            name:
+              type: string
+            avatar:
+              type: string
+              format: uri
+        itemCount:
+          type: integer
+        totalAmount:
+          type: number
+          format: double
+        paymentMethod:
+          type: string
+          example: "Visa **** 4242"
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        carrier:
+          type: string
+          example: "SwiftExpress"
+
+    OrderDetail:
+      type: object
+      properties:
+        orderId:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        createdAt:
+          type: string
+          format: date-time
+        customer:
+          type: object
+          properties:
+            name:
+              type: string
+            phone:
+              type: string
+        shippingAddress:
+          $ref: '#/components/schemas/ShippingAddress'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        payment:
+          $ref: '#/components/schemas/PaymentInfo'
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineEvent'
+        deliveryEstimate:
+          type: string
+          format: date-time
+        currentLocation:
+          type: string
+          example: "North Hub Distribution Center"
+        totalAmount:
+          type: number
+          format: double
+
+    OrderItem:
+      type: object
+      properties:
+        productId:
+          type: string
+        name:
+          type: string
+        thumbnailUrl:
+          type: string
+          format: uri
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+          format: double
+
+    ShippingAddress:
+      type: object
+      properties:
+        recipientName:
+          type: string
+        addressLine:
+          type: string
+        district:
+          type: string
+        city:
+          type: string
+
+    PaymentInfo:
+      type: object
+      properties:
+        method:
+          type: string
+          example: "Visa"
+        cardLast4:
+          type: string
+          example: "4242"
+        status:
+          type: string
+          enum: [paid, pending]
+
+    TimelineEvent:
+      type: object
+      properties:
+        status:
+          type: string
+        label:
+          type: string
+          example: "Arrived at Sort Facility"
+        description:
+          type: string
+        location:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        isCompleted:
+          type: boolean
+
+    UpdateOrderStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        note:
+          type: string
+
+    OrderListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        summary:
+          type: object
+          properties:
+            totalOrders:
+              type: integer
+            pendingOrders:
+              type: integer
+            shippingOrders:
+              type: integer
+            failedOrders:
+              type: integer
+            totalRevenueMTD:
+              type: number
+              format: double
+
+    # ---------- TRACKING ----------
+    TrackingResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+        currentStatus:
+          type: string
+        currentLocation:
+          type: string
+        estimatedDelivery:
+          type: string
+          format: date-time
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineEvent'
+        mapCoordinates:
+          $ref: '#/components/schemas/Coordinates'
+
+    Coordinates:
+      type: object
+      properties:
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+
+    # ---------- RETURNS ----------
+    ReturnStatus:
+      type: string
+      enum: [pending, approved, rejected, completed]
+
+    ReturnSummary:
+      type: object
+      properties:
+        returnId:
+          type: string
+          example: "#RET-8842"
+        initiatedAt:
+          type: string
+          format: date-time
+        customer:
+          type: object
+          properties:
+            name:
+              type: string
+              example: "Eleanor Shellstrop"
+            orderId:
+              type: string
+              example: "#ORD-9921-X"
+        reason:
+          type: string
+        returnType:
+          type: string
+        inventoryStatus:
+          type: string
+        processingStatus:
+          $ref: '#/components/schemas/ReturnStatus'
+
+    ReturnListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        summary:
+          type: object
+          properties:
+            totalReturns:
+              type: integer
+            processingReturns:
+              type: integer
+            carrierDelays:
+              type: integer
+            processingRate:
+              type: number
+              format: double
+              description: Tỷ lệ xử lý (%)
+
+    # ---------- SHIPPER ----------
+    ShipperTask:
+      type: object
+      properties:
+        orderId:
+          type: string
+        orderCode:
+          type: string
+        totalAmount:
+          type: number
+          format: double
+        recipient:
+          type: object
+          properties:
+            name:
+              type: string
+            phone:
+              type: string
+            address:
+              type: string
+            coordinates:
+              $ref: '#/components/schemas/Coordinates'
+        status:
+          type: string
+          enum: [picking, delivering, delivered]
+
+    ShipperTasksResponse:
+      type: object
+      properties:
+        activeTask:
+          $ref: '#/components/schemas/ShipperTask'
+        pendingTasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShipperTask'
+        metrics:
+          type: object
+          properties:
+            successRate:
+              type: number
+              format: double
+              example: 94.0
+            deliveredToday:
+              type: integer
+              example: 92
+            failedToday:
+              type: integer
+              example: 12
+            totalToday:
+              type: integer
+              example: 128
+        activityLog:
+          type: array
+          items:
+            type: object
+            properties:
+              event:
+                type: string
+                example: "Delivered #LP-90282"
+              detail:
+                type: string
+                example: "09:45 AM • Signature Collected"
+              time:
+                type: string
+                format: date-time
+
+    ScanQRRequest:
+      type: object
+      required: [qrCode]
+      properties:
+        qrCode:
+          type: string
+
+    ScanQRResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+        action:
+          type: string
+          enum: [pickup, delivery]
+        orderDetail:
+          $ref: '#/components/schemas/OrderDetail'
+
+    ConfirmDeliveryRequest:
+      type: object
+      required: [confirmationType, timestamp, coordinates]
+      properties:
+        confirmationType:
+          type: string
+          enum: [photo, signature]
+        imageBase64:
+          type: string
+          nullable: true
+          description: Ảnh chụp POD (nếu chọn photo)
+        signatureBase64:
+          type: string
+          nullable: true
+          description: Ảnh chữ ký (nếu chọn signature)
+        timestamp:
+          type: string
+          format: date-time
+        coordinates:
+          $ref: '#/components/schemas/Coordinates'
+
+    UpdateShipperOrderStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [picked_up, in_transit, delivered, failed]
+        reason:
+          type: string
+          nullable: true
+
+    # ---------- PRODUCTS ----------
+    ProductStatus:
+      type: string
+      enum: [active, inactive, draft]
+
+    ProductSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: "Nike Air Max Velocity"
+        sku:
+          type: string
+          example: "NK-AM-2024-RD"
+        category:
+          type: string
+          example: "Giày Thời Trang"
+        price:
+          type: number
+          format: double
+          example: 2450000
+        originalPrice:
+          type: number
+          format: double
+        stockQuantity:
+          type: integer
+          example: 124
+        stockStatus:
+          type: string
+          enum: [in_stock, limited, out_of_stock]
+        imageUrl:
+          type: string
+          format: uri
+        badge:
+          type: string
+          enum: [sale, new]
+          nullable: true
+        rating:
+          type: number
+          format: double
+          example: 4.8
+        reviewCount:
+          type: integer
+          example: 124
+        status:
+          $ref: '#/components/schemas/ProductStatus'
+
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProductSummary'
+        - type: object
+          properties:
+            description:
+              type: string
+            features:
+              type: array
+              items:
+                type: string
+            images:
+              type: array
+              items:
+                type: string
+                format: uri
+            inventory:
+              $ref: '#/components/schemas/InventoryDetail'
+
+    InventoryDetail:
+      type: object
+      properties:
+        warehouseA:
+          type: object
+          properties:
+            available:
+              type: integer
+            location:
+              type: string
+        warehouseB:
+          type: object
+          properties:
+            available:
+              type: integer
+            location:
+              type: string
+        lastUpdated:
+          type: string
+          format: date-time
+
+    ProductListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductSummary'
+        categories:
+          type: array
+          items:
+            type: string
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        inventorySummary:
+          type: object
+          properties:
+            totalValue:
+              type: number
+              format: double
+            totalSKUs:
+              type: integer
+            lowStockCount:
+              type: integer
+
+    CreateProductRequest:
+      type: object
+      required: [name, sku, category, price, stockQuantity]
+      properties:
+        name:
+          type: string
+          example: "Nike Air Max Velocity"
+        sku:
+          type: string
+          example: "NK-AM-2024-RD"
+        category:
+          type: string
+          example: "Giày"
+        price:
+          type: number
+          format: double
+          example: 2450000
+        stockQuantity:
+          type: integer
+          example: 124
+        description:
+          type: string
+        imageBase64:
+          type: string
+          description: Ảnh sản phẩm encode base64
+
+    # ---------- REVIEWS ----------
+    Review:
+      type: object
+      properties:
+        reviewId:
+          type: string
+        author:
+          type: object
+          properties:
+            name:
+              type: string
+            avatarUrl:
+              type: string
+              format: uri
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        helpfulCount:
+          type: integer
+
+    ReviewListResponse:
+      type: object
+      properties:
+        averageRating:
+          type: number
+          format: double
+          example: 4.8
+        totalReviews:
+          type: integer
+          example: 124
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Review'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreateReviewRequest:
+      type: object
+      required: [rating, content]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        content:
+          type: string
+
+    # ---------- SHIPPING / CARRIER ----------
+    Carrier:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: "SwiftExpress"
+        description:
+          type: string
+          example: "Vận chuyển hỏa tốc nội đô & liên tỉnh"
+        isActive:
+          type: boolean
+        status:
+          type: string
+          enum: [active, maintenance]
+
+    ShippingFeeRow:
+      type: object
+      properties:
+        zone:
+          type: string
+          example: "Nội thành HCM"
+        standardFee:
+          type: number
+          format: double
+        expressFee:
+          type: number
+          format: double
+        sameDayFee:
+          type: number
+          format: double
+
+    ShippingSettings:
+      type: object
+      properties:
+        freeShippingThreshold:
+          type: number
+          format: double
+          example: 1500000
+        weightCalculationMethod:
+          type: string
+          example: "Trọng lượng quy đổi (DIM)"
+        codEnabled:
+          type: boolean
+
+    PaymentMethod:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: "Visa / Mastercard"
+        type:
+          type: string
+          enum: [card, cod, e_wallet, bank_transfer]
+        isActive:
+          type: boolean
+
+    # ---------- ADMIN ----------
+    AdminStats:
+      type: object
+      properties:
+        totalRevenueMTD:
+          type: number
+          format: double
+          example: 2845192.44
+        totalOrders:
+          type: integer
+          example: 12482
+        pendingOrders:
+          type: integer
+          example: 1042
+        shippingOrders:
+          type: integer
+          example: 8920
+        failedOrders:
+          type: integer
+          example: 42
+        errorRate:
+          type: number
+          format: double
+          example: 0.3
+        carrierDistribution:
+          type: array
+          items:
+            type: object
+            properties:
+              carrier:
+                type: string
+              percentage:
+                type: number
+                format: double
+        processingPerformance:
+          type: object
+          properties:
+            rate:
+              type: number
+              format: double
+            weekOverWeek:
+              type: number
+              format: double
+              description: "% thay đổi so với tuần trước"
+        alerts:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [urgent, warning, info]
+              title:
+                type: string
+                example: "Urgent Inspection"
+              count:
+                type: integer
+              detail:
+                type: string
+                example: "Exceeding 48h SLA"
+
+    # ---------- COMMON ----------
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 100
+        totalPages:
+          type: integer
+          example: 10
+
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+
+  # ============================================================
+  # RESPONSES CHUNG
+  # ============================================================
+  responses:
+    Unauthorized:
+      description: Chưa đăng nhập hoặc token hết hạn
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Không có quyền truy cập
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Không tìm thấy resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BadRequest:
+      description: Dữ liệu đầu vào không hợp lệ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+# ============================================================
+# PATHS
+# ============================================================
+paths:
+
+  # ===== AUTH =====
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Đăng nhập (Customer / Shipper / Admin)
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: Đăng nhập thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          description: Sai email hoặc mật khẩu
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Đăng xuất
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Đăng xuất thành công
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Làm mới Access Token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        "200":
+          description: Token mới
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===== CART =====
+  /cart:
+    get:
+      tags: [Cart]
+      summary: Lấy giỏ hàng hiện tại kèm trạng thái tồn kho
+      operationId: getCart
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Giỏ hàng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /cart/items/{itemId}:
+    put:
+      tags: [Cart]
+      summary: Cập nhật số lượng sản phẩm trong giỏ
+      operationId: updateCartItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Cart]
+      summary: Xóa sản phẩm khỏi giỏ hàng
+      operationId: removeCartItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Xóa thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /cart/checkout:
+    post:
+      tags: [Cart]
+      summary: Đặt hàng từ giỏ hàng
+      operationId: checkout
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Đặt hàng thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===== ORDERS =====
+  /orders:
+    get:
+      tags: [Orders]
+      summary: Danh sách đơn hàng (Admin)
+      operationId: getOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: search
+          in: query
+          schema:
+            type: string
+            description: Tìm theo mã đơn hoặc tên khách
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Danh sách đơn hàng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /orders/my:
+    get:
+      tags: [Orders]
+      summary: Đơn hàng của tôi (Customer)
+      operationId: getMyOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Đơn hàng của khách
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /orders/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Chi tiết đơn hàng
+      operationId: getOrderById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Chi tiết đơn hàng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /orders/{orderId}/status:
+    patch:
+      tags: [Orders]
+      summary: Cập nhật trạng thái đơn hàng (Admin/Seller)
+      operationId: updateOrderStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderStatusRequest'
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ===== TRACKING =====
+  /tracking/{orderId}:
+    get:
+      tags: [Tracking]
+      summary: Theo dõi hành trình đơn hàng
+      operationId: trackOrder
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "ORD-9921-X"
+      responses:
+        "200":
+          description: Thông tin tracking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingResponse'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ===== RETURNS =====
+  /returns:
+    get:
+      tags: [Returns]
+      summary: Danh sách trả hàng
+      operationId: getReturns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ReturnStatus'
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Danh sách trả hàng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnListResponse'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /returns/{returnId}/approve:
+    patch:
+      tags: [Returns]
+      summary: Duyệt trả hàng
+      operationId: approveReturn
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: returnId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Đã duyệt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /returns/{returnId}/reject:
+    patch:
+      tags: [Returns]
+      summary: Từ chối trả hàng
+      operationId: rejectReturn
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: returnId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Đã từ chối
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ===== SHIPPER =====
+  /shipper/tasks:
+    get:
+      tags: [Shipper]
+      summary: Danh sách nhiệm vụ của shipper
+      operationId: getShipperTasks
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Tasks + metrics + activity log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShipperTasksResponse'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /shipper/scan:
+    post:
+      tags: [Shipper]
+      summary: Quét mã QR để lấy / giao hàng
+      operationId: scanQR
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanQRRequest'
+      responses:
+        "200":
+          description: Thông tin đơn hàng từ QR
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanQRResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /shipper/orders/{orderId}/confirm-delivery:
+    post:
+      tags: [Shipper]
+      summary: Xác nhận giao hàng thành công (ảnh hoặc chữ ký)
+      operationId: confirmDelivery
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmDeliveryRequest'
+      responses:
+        "200":
+          description: Xác nhận thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  /shipper/orders/{orderId}/status:
+    patch:
+      tags: [Shipper]
+      summary: Cập nhật trạng thái giao hàng
+      operationId: updateShipperOrderStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateShipperOrderStatusRequest'
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  # ===== PRODUCTS =====
+  /products:
+    get:
+      tags: [Products]
+      summary: Danh sách sản phẩm (Storefront + CMS)
+      operationId: getProducts
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [price_asc, price_desc, newest, rating]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: Danh sách sản phẩm
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+
+    post:
+      tags: [Products]
+      summary: Thêm sản phẩm mới (Admin/CMS)
+      operationId: createProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetail'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /products/{productId}:
+    get:
+      tags: [Products]
+      summary: Chi tiết sản phẩm
+      operationId: getProductById
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Chi tiết sản phẩm
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetail'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Products]
+      summary: Cập nhật sản phẩm (Admin/CMS)
+      operationId: updateProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetail'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Products]
+      summary: Xóa sản phẩm (Admin/CMS)
+      operationId: deleteProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Xóa thành công
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /products/{productId}/inventory:
+    get:
+      tags: [Products]
+      summary: Kiểm tra tồn kho real-time (Product Detail)
+      operationId: getProductInventory
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thông tin tồn kho theo kho
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryDetail'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ===== REVIEWS =====
+  /products/{productId}/reviews:
+    get:
+      tags: [Reviews]
+      summary: Danh sách đánh giá sản phẩm
+      operationId: getProductReviews
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Danh sách review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewListResponse'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Reviews]
+      summary: Viết đánh giá sản phẩm
+      operationId: createReview
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewRequest'
+      responses:
+        "201":
+          description: Đánh giá thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===== SHIPPING / CARRIER =====
+  /shipping/carriers:
+    get:
+      tags: [Shipping]
+      summary: Danh sách carrier (SwiftExpress, Global Freight, Vietnam Post)
+      operationId: getCarriers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Danh sách carrier
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  carriers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Carrier'
+
+  /shipping/carriers/{carrierId}/toggle:
+    patch:
+      tags: [Shipping]
+      summary: Bật/tắt carrier
+      operationId: toggleCarrier
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: carrierId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Carrier'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /shipping/fee-table:
+    get:
+      tags: [Shipping]
+      summary: Bảng phí vận chuyển theo vùng
+      operationId: getShippingFeeTable
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Bảng phí
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ShippingFeeRow'
+
+  /shipping/settings:
+    get:
+      tags: [Shipping]
+      summary: Lấy cài đặt vận chuyển
+      operationId: getShippingSettings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cài đặt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShippingSettings'
+
+    put:
+      tags: [Shipping]
+      summary: Cập nhật cài đặt vận chuyển
+      operationId: updateShippingSettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShippingSettings'
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShippingSettings'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /shipping/payment-methods:
+    get:
+      tags: [Shipping]
+      summary: Danh sách phương thức thanh toán
+      operationId: getPaymentMethods
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Phương thức thanh toán
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PaymentMethod'
+
+  # ===== ADMIN =====
+  /admin/stats:
+    get:
+      tags: [Admin]
+      summary: Thống kê tổng quan Admin Dashboard
+      operationId: getAdminStats
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Thống kê
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStats'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  # ===== NEWSLETTER =====
+  /newsletter/subscribe:
+    post:
+      tags: [Newsletter]
+      summary: Đăng ký nhận bản tin (Storefront footer)
+      operationId: subscribeNewsletter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "khachhang@gmail.com"
+      responses:
+        "200":
+          description: Đăng ký thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  # ===== NOTIFICATIONS =====
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Danh sách thông báo của người dùng
+      operationId: getNotifications
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Thông báo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        title:
+                          type: string
+                        body:
+                          type: string
+                        isRead:
+                          type: boolean
+                        createdAt:
+                          type: string
+                          format: date-time
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+security:
+  - bearerAuth: []

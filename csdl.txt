@@ -1,0 +1,386 @@
+-- ============================================================
+-- ORDER TRACKING SYSTEM — SCHEMA v3 (LEAN)
+-- ============================================================
+-- 15 bảng, đúng theo nghiệp vụ:
+--   GĐ0: Order Management (cart, inventory, discounts, payments)
+--   GĐ1: Order Ingestion (orders, order_items, shipping_carriers)
+--   GĐ2: State Machine (orders.status)
+--   GĐ3: Tracking Logs (tracking_logs)
+--   GĐ4: Async Notifications (notification_logs)
+--   Bổ trợ: users, user_roles, addresses, categories, products
+-- ============================================================
+
+-- ============================================================
+-- 1. USERS & ROLES
+-- ============================================================
+
+CREATE TABLE users (
+    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    full_name     VARCHAR(100)  NOT NULL,
+    email         VARCHAR(255)  NOT NULL UNIQUE,
+    password_hash VARCHAR(255)  NOT NULL,
+    phone         VARCHAR(20)   UNIQUE,
+    avatar_url    VARCHAR(255)  NULL,
+    is_active     BOOLEAN       NOT NULL DEFAULT TRUE,
+    deleted_at    TIMESTAMP     NULL,
+    created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_users_email (email),
+    INDEX idx_users_phone (phone)
+);
+
+CREATE TABLE user_roles (
+    user_id BIGINT UNSIGNED NOT NULL,
+    role    ENUM('BUYER','SELLER','SHIPPER','ADMIN') NOT NULL,
+    PRIMARY KEY (user_id, role),
+    CONSTRAINT fk_user_roles_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 2. ADDRESSES
+-- ============================================================
+
+CREATE TABLE addresses (
+    id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id        BIGINT UNSIGNED NOT NULL,
+    label          VARCHAR(50)     NULL,                -- 'HOME', 'OFFICE', 'OTHER'
+    receiver_name  VARCHAR(100)    NULL,                -- tên người nhận (null = dùng user.full_name)
+    receiver_phone VARCHAR(20)     NULL,                -- SĐT người nhận (null = dùng user.phone)
+    province       VARCHAR(100)    NOT NULL,
+    district       VARCHAR(100)    NOT NULL,
+    ward           VARCHAR(100)    NOT NULL,
+    street         VARCHAR(255)    NOT NULL,
+    is_default     BOOLEAN         NOT NULL DEFAULT FALSE,
+    created_at     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_addresses_user (user_id),
+    CONSTRAINT fk_addresses_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- 3. PRODUCT CATALOG
+-- ============================================================
+
+CREATE TABLE categories (
+    id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name       VARCHAR(100)    NOT NULL,
+    slug       VARCHAR(150)    NOT NULL UNIQUE,
+    icon_url   VARCHAR(255)    NULL,
+    parent_id  BIGINT UNSIGNED NULL,
+    sort_order INT UNSIGNED    NOT NULL DEFAULT 0,
+    is_active  BOOLEAN         NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_categories_parent FOREIGN KEY (parent_id) REFERENCES categories (id) ON DELETE SET NULL
+);
+
+CREATE TABLE products (
+    id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    seller_id    BIGINT UNSIGNED NOT NULL,
+    category_id  BIGINT UNSIGNED NOT NULL,
+    sku          VARCHAR(50)     NOT NULL UNIQUE,
+    slug         VARCHAR(255)    NOT NULL UNIQUE,
+    name         VARCHAR(255)    NOT NULL,
+    description  TEXT,
+    base_price   DECIMAL(15, 2)  NOT NULL,
+    sale_price   DECIMAL(15, 2)  NULL,
+    weight       DECIMAL(8, 3)   NOT NULL DEFAULT 0.000,
+    status       ENUM('ACTIVE','INACTIVE','OUT_OF_STOCK') NOT NULL DEFAULT 'ACTIVE',
+    deleted_at   TIMESTAMP       NULL,
+    created_at   TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_products_seller (seller_id),
+    INDEX idx_products_category (category_id),
+    INDEX idx_products_status (status),
+    INDEX idx_products_sku (sku),
+    FULLTEXT INDEX ft_products_name (name),
+
+    CONSTRAINT fk_products_seller   FOREIGN KEY (seller_id)   REFERENCES users (id),
+    CONSTRAINT fk_products_category FOREIGN KEY (category_id) REFERENCES categories (id)
+);
+
+-- ============================================================
+-- 4. INVENTORY
+-- ============================================================
+
+CREATE TABLE inventory (
+    id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    product_id        BIGINT UNSIGNED NOT NULL UNIQUE,
+    quantity_in_stock INT UNSIGNED    NOT NULL DEFAULT 0,
+    quantity_reserved INT UNSIGNED    NOT NULL DEFAULT 0,
+    updated_at        TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_inventory_product FOREIGN KEY (product_id) REFERENCES products (id)
+);
+
+-- ============================================================
+-- 5. DISCOUNTS
+-- ============================================================
+
+CREATE TABLE discounts (
+    id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    seller_id             BIGINT UNSIGNED NULL,           -- NULL = platform-level discount
+    code                  VARCHAR(50)     NOT NULL UNIQUE,
+    type                  ENUM('PERCENTAGE','FIXED') NOT NULL,
+    scope                 ENUM('ORDER','PRODUCT','CATEGORY','SHIPPING') NOT NULL DEFAULT 'ORDER',
+    value                 DECIMAL(15, 2)  NOT NULL,
+    max_discount_amount   DECIMAL(15, 2)  NULL,           -- cap cho PERCENTAGE type
+    min_order_value       DECIMAL(15, 2)  NOT NULL DEFAULT 0,
+    max_uses              INT UNSIGNED    NULL,
+    used_count            INT UNSIGNED    NOT NULL DEFAULT 0,
+    usage_limit_per_user  INT UNSIGNED    NULL,
+    is_active             BOOLEAN         NOT NULL DEFAULT TRUE,
+    start_at              TIMESTAMP       NULL,
+    expires_at            TIMESTAMP       NULL,
+    created_at            TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_discounts_code (code),
+    INDEX idx_discounts_active (is_active, start_at, expires_at),
+    CONSTRAINT fk_discounts_seller FOREIGN KEY (seller_id) REFERENCES users (id)
+);
+
+-- ============================================================
+-- 6. CART
+-- ============================================================
+
+CREATE TABLE carts (
+    id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id    BIGINT UNSIGNED NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_carts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE TABLE cart_items (
+    id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    cart_id        BIGINT UNSIGNED NOT NULL,
+    product_id     BIGINT UNSIGNED NOT NULL,
+    quantity       INT UNSIGNED    NOT NULL DEFAULT 1,
+    price_snapshot DECIMAL(15, 2)  NOT NULL,
+    added_at       TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uq_cart_product (cart_id, product_id),
+
+    INDEX idx_cart_items_product (product_id),
+
+    CONSTRAINT fk_cart_items_cart    FOREIGN KEY (cart_id)    REFERENCES carts (id) ON DELETE CASCADE,
+    CONSTRAINT fk_cart_items_product FOREIGN KEY (product_id) REFERENCES products (id)
+);
+
+-- ============================================================
+-- 7. SHIPPING CARRIERS
+-- ============================================================
+
+CREATE TABLE shipping_carriers (
+    id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    code                  VARCHAR(20)    NOT NULL UNIQUE,
+    name                  VARCHAR(100)   NOT NULL,
+    logo_url              VARCHAR(255)   NULL,
+    tracking_url_template VARCHAR(255)   NULL,              -- e.g. https://track.carrier.com/{tracking_number}
+    region                VARCHAR(100)   NOT NULL,
+    base_fee              DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+    is_active             BOOLEAN        NOT NULL DEFAULT TRUE,
+    created_at            TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- 8. ORDERS
+-- ============================================================
+
+CREATE TABLE orders (
+    id               BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_code       VARCHAR(50) NOT NULL UNIQUE,
+
+    user_id          BIGINT UNSIGNED NOT NULL,
+    address_id       BIGINT UNSIGNED NULL,
+
+    -- SNAPSHOT receiver info
+    receiver_name    VARCHAR(100) NOT NULL,
+    receiver_phone   VARCHAR(20)  NOT NULL,
+
+    -- SNAPSHOT address
+    province         VARCHAR(100) NOT NULL,
+    district         VARCHAR(100) NOT NULL,
+    ward             VARCHAR(100) NOT NULL,
+    street           VARCHAR(255) NOT NULL,
+
+    discount_id      BIGINT UNSIGNED NULL,
+    carrier_id       BIGINT UNSIGNED NOT NULL,
+
+    tracking_number  VARCHAR(100) UNIQUE,
+    tracking_url     VARCHAR(255) NULL,
+
+    subtotal         DECIMAL(15, 2) NOT NULL,
+    discount_amount  DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+    shipping_fee     DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+    grand_total      DECIMAL(15, 2) NOT NULL,
+
+    status ENUM(
+        'PENDING','CONFIRMED','PICKING','SHIPPING',
+        'DELIVERED','FAILED','RETURNING','REATTEMPT','CANCELLED'
+    ) NOT NULL DEFAULT 'PENDING',
+
+    payment_status ENUM(
+        'UNPAID','AWAITING_PAYMENT','PAID','FAILED','REFUNDED'
+    ) NOT NULL DEFAULT 'UNPAID',
+
+    payment_method ENUM('COD','VNPAY','MOMO','STRIPE') NOT NULL,
+
+    note TEXT NULL,
+    cancel_reason TEXT NULL,
+    failure_reason TEXT NULL,
+
+    -- TIMELINE
+    confirmed_at TIMESTAMP NULL,
+    picked_at    TIMESTAMP NULL,
+    shipped_at   TIMESTAMP NULL,
+    delivered_at TIMESTAMP NULL,
+    cancelled_at TIMESTAMP NULL,
+
+    estimated_delivery_at TIMESTAMP NULL,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_orders_user_id (user_id),
+    INDEX idx_orders_status (status),
+    INDEX idx_orders_payment_status (payment_status),
+    INDEX idx_orders_created_at (created_at),
+    INDEX idx_orders_order_code (order_code),
+
+    CONSTRAINT fk_orders_user     FOREIGN KEY (user_id)     REFERENCES users (id),
+    CONSTRAINT fk_orders_address  FOREIGN KEY (address_id)  REFERENCES addresses (id),
+    CONSTRAINT fk_orders_discount FOREIGN KEY (discount_id) REFERENCES discounts (id),
+    CONSTRAINT fk_orders_carrier  FOREIGN KEY (carrier_id)  REFERENCES shipping_carriers (id)
+);
+
+-- ============================================================
+-- 9. ORDER ITEMS (SNAPSHOT)
+-- ============================================================
+
+CREATE TABLE order_items (
+    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_id      BIGINT UNSIGNED NOT NULL,
+
+    product_id    BIGINT UNSIGNED NOT NULL,
+    product_name  VARCHAR(255)    NOT NULL,
+    product_image VARCHAR(255)    NULL,
+    product_sku   VARCHAR(50)     NULL,
+
+    seller_id     BIGINT UNSIGNED NOT NULL,
+    seller_name   VARCHAR(100)    NOT NULL,
+
+    quantity      INT UNSIGNED    NOT NULL,
+    unit_price    DECIMAL(15, 2)  NOT NULL,
+    subtotal      DECIMAL(15, 2)  NOT NULL,
+
+    weight        DECIMAL(8,3)    DEFAULT 0.000,
+
+    created_at    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_order_items_order (order_id),
+    INDEX idx_order_items_seller (seller_id),
+
+    CONSTRAINT fk_order_items_order   FOREIGN KEY (order_id)   REFERENCES orders (id),
+    CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products (id),
+    CONSTRAINT fk_order_items_seller  FOREIGN KEY (seller_id)  REFERENCES users (id)
+);
+
+-- ============================================================
+-- 10. PAYMENTS
+-- ============================================================
+
+CREATE TABLE payments (
+    id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_id       BIGINT UNSIGNED NOT NULL,
+
+    method         ENUM('COD','VNPAY','MOMO','STRIPE') NOT NULL,
+    status         ENUM('UNPAID','AWAITING_PAYMENT','PAID','FAILED','REFUNDED') NOT NULL,
+
+    amount         DECIMAL(15, 2) NOT NULL,
+    currency       VARCHAR(10) DEFAULT 'VND',
+
+    transaction_id VARCHAR(255) NULL,
+    provider       VARCHAR(50) NULL,
+
+    failure_reason TEXT NULL,
+
+    paid_at        TIMESTAMP NULL,
+    refunded_at    TIMESTAMP NULL,
+
+    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_payments_order_id (order_id),
+
+    CONSTRAINT fk_payments_order FOREIGN KEY (order_id) REFERENCES orders (id)
+);
+
+-- ============================================================
+-- 11. TRACKING LOGS (Giai đoạn 3 — Ghi vết)
+-- ============================================================
+
+CREATE TABLE tracking_logs (
+    id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_id   BIGINT UNSIGNED NOT NULL,
+
+    updated_by BIGINT UNSIGNED NOT NULL,
+
+    from_status ENUM(
+        'PENDING','CONFIRMED','PICKING','SHIPPING',
+        'DELIVERED','FAILED','RETURNING','REATTEMPT','CANCELLED'
+    ) NULL,
+    to_status ENUM(
+        'PENDING','CONFIRMED','PICKING','SHIPPING',
+        'DELIVERED','FAILED','RETURNING','REATTEMPT','CANCELLED'
+    ) NOT NULL,
+
+    location    VARCHAR(255) NULL,
+    note        TEXT NULL,
+
+    event_type ENUM('SYSTEM','SHIPPER','ADMIN','CARRIER') DEFAULT 'SYSTEM',
+
+    proof_image_url VARCHAR(255) NULL,
+
+    event_time TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_tracking_logs_order (order_id, created_at),
+
+    CONSTRAINT fk_tracking_logs_order      FOREIGN KEY (order_id)   REFERENCES orders (id),
+    CONSTRAINT fk_tracking_logs_updated_by FOREIGN KEY (updated_by) REFERENCES users (id)
+);
+
+-- ============================================================
+-- 12. NOTIFICATION LOGS (Giai đoạn 4 — Async Notifications)
+-- ============================================================
+
+CREATE TABLE notification_logs (
+    id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_id       BIGINT UNSIGNED NULL,
+    user_id        BIGINT UNSIGNED NOT NULL,
+
+    type           ENUM('EMAIL','SMS') NOT NULL,
+    trigger_status VARCHAR(50) NOT NULL,
+
+    title          VARCHAR(255) NULL,
+    content        TEXT NULL,
+
+    send_status    ENUM('PENDING','SENT','FAILED') DEFAULT 'PENDING',
+    retry_count    TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    sent_at        TIMESTAMP NULL,
+
+    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_notif_order (order_id),
+    INDEX idx_notif_user (user_id),
+
+    CONSTRAINT fk_notification_logs_order FOREIGN KEY (order_id) REFERENCES orders (id),
+    CONSTRAINT fk_notification_logs_user  FOREIGN KEY (user_id)  REFERENCES users (id)
+);
