@@ -1,5 +1,7 @@
 package com.example.tracking_order.exception;
 
+import com.example.tracking_order.modules.user.entity.User;
+
 import lombok.Getter;
 
 @Getter

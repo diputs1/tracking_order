@@ -1,7 +1,7 @@
 package com.example.tracking_order.security;
 
-import com.example.tracking_order.entity.User;
-import lombok.AllArgsConstructor;
+import com.example.tracking_order.modules.user.entity.User;
+
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -10,14 +10,25 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@AllArgsConstructor
 public class UserDetailsImpl implements UserDetails {
 
     private Long id;
     private String email;
     private String password;
     private Boolean isActive;
+    private String fullName;
+    private String avatarUrl;
     private Collection<? extends GrantedAuthority> authorities;
+
+    public UserDetailsImpl(Long id, String email, String password, Boolean isActive, String fullName, String avatarUrl, Collection<? extends GrantedAuthority> authorities) {
+        this.id = id;
+        this.email = email;
+        this.password = password;
+        this.isActive = isActive;
+        this.fullName = fullName;
+        this.avatarUrl = avatarUrl;
+        this.authorities = authorities;
+    }
 
     public static UserDetailsImpl build(User user) {
         List<GrantedAuthority> authorities = user.getRoles().stream()
@@ -29,12 +40,22 @@ public class UserDetailsImpl implements UserDetails {
                 user.getEmail(),
                 user.getPasswordHash(),
                 user.getIsActive(),
+                user.getFullName(),
+                user.getAvatarUrl(),
                 authorities
         );
     }
 
     public Long getId() {
         return id;
+    }
+    
+    public String getFullName() {
+        return fullName;
+    }
+    
+    public String getAvatarUrl() {
+        return avatarUrl;
     }
 
     @Override

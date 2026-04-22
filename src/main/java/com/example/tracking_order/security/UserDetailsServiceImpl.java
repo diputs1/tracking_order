@@ -1,7 +1,8 @@
 package com.example.tracking_order.security;
 
-import com.example.tracking_order.entity.User;
-import com.example.tracking_order.repository.UserRepository;
+import com.example.tracking_order.modules.user.entity.User;
+
+import com.example.tracking_order.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
