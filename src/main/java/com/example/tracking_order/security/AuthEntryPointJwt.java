@@ -1,7 +1,7 @@
 package com.example.tracking_order.security;
 
-import com.example.tracking_order.common.ApiResponse;
-import com.example.tracking_order.exception.ErrorCode;
+import com.example.tracking_order.common.response.ApiResponse;
+import com.example.tracking_order.common.exception.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +27,6 @@ public class AuthEntryPointJwt implements AuthenticationEntryPoint {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 
         final ObjectMapper mapper = new ObjectMapper();
-        mapper.writeValue(response.getOutputStream(), ApiResponse.error(ErrorCode.UNAUTHORIZED.getMessage()));
+        mapper.writeValue(response.getOutputStream(), ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.name(), null));
     }
 }

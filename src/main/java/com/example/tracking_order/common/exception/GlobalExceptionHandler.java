@@ -3,6 +3,8 @@ package com.example.tracking_order.common.exception;
 import com.example.tracking_order.common.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -20,6 +22,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleAppException(AppException ex) {
         return ResponseEntity.status(ex.getErrorCode().getStatus())
                 .body(ApiResponse.error(ex.getErrorCode().getCode(), ex.getMessage(), ex.getErrors()));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error("FORBIDDEN", "Bạn không có quyền truy cập tài nguyên này", null));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(AuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("UNAUTHORIZED", "Lỗi xác thực: " + ex.getMessage(), null));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
