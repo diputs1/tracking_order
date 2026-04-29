@@ -49,6 +49,10 @@ public class UserDetailsImpl implements UserDetails {
     public Long getId() {
         return id;
     }
+
+    public String getEmail() {
+        return email;
+    }
     
     public String getFullName() {
         return fullName;

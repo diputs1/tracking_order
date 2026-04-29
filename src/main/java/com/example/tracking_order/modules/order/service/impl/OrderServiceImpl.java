@@ -1,5 +1,6 @@
 package com.example.tracking_order.modules.order.service.impl;
 
+import com.example.tracking_order.common.annotation.LogExecutionTime;
 import com.example.tracking_order.common.exception.AppException;
 import com.example.tracking_order.common.exception.ErrorCode;
 import com.example.tracking_order.common.response.PageData;
@@ -40,6 +41,7 @@ public class OrderServiceImpl implements OrderService {
     private final NotificationService notificationService;
 
     @Override
+    @LogExecutionTime
     public PageData<OrderListDto> getOrders(Long userId, OrderStatus status, LocalDateTime fromDate, LocalDateTime toDate, int page, int size) {
         Specification<Order> spec = (root, query, cb) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
@@ -123,6 +125,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    @LogExecutionTime
     public OrderDetailDto updateOrderStatus(Long orderId, OrderStatusUpdateRequest request) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Đơn hàng không tồn tại"));
