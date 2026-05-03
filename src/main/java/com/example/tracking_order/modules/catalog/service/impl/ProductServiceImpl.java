@@ -43,6 +43,7 @@ public class ProductServiceImpl implements ProductService {
     private final UserRepository userRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public PageData<ProductListDto> getProducts(String search, String sku, Long categoryId, ProductStatus status,
                                                  BigDecimal minPrice, BigDecimal maxPrice, Long sellerId,
                                                  String sort, int page, int size) {
@@ -139,7 +140,38 @@ public class ProductServiceImpl implements ProductService {
         return getProductDetail(product.getId());
     }
 
+    private User getCurrentUser() {
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return userRepository.findById(userDetails.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED, "Người dùng không hợp lệ"));
+    }
+
+    private void checkProductOwnership(Product product, User user) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        
+        if (!isAdmin && !product.getSeller().getId().equals(user.getId())) {
+            throw new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thao tác trên sản phẩm này");
+        }
+    }
+
+    private Product getProductWithOwnerCheck(Long productId, User user) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        
+        if (isAdmin) {
+            return productRepository.findById(productId)
+                    .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không tồn tại"));
+        } else {
+            return productRepository.findByIdAndSellerId(productId, user.getId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thao tác trên sản phẩm này hoặc sản phẩm không tồn tại"));
+        }
+    }
+
     @Override
+    @Transactional(readOnly = true)
     public ProductDetailDto getProductDetail(Long productId) {
         Product product = productRepository.findByIdWithDetails(productId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không tồn tại"));
@@ -149,8 +181,8 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional
     public ProductDetailDto updateProduct(Long productId, UpdateProductRequest request) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không tồn tại"));
+        User user = getCurrentUser();
+        Product product = getProductWithOwnerCheck(productId, user);
 
         if (request.getName() != null) product.setName(request.getName());
         if (request.getBasePrice() != null) product.setBasePrice(request.getBasePrice());
@@ -164,6 +196,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public InventoryDto getInventory(Long productId) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không có kho"));
@@ -173,8 +206,11 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional
     public InventoryDto updateInventory(Long productId, UpdateInventoryRequest request) {
+        User user = getCurrentUser();
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không có kho"));
+
+        getProductWithOwnerCheck(productId, user);
 
         inventory.setQuantityInStock(request.getQuantityInStock());
         inventoryRepository.save(inventory);
@@ -210,34 +246,6 @@ public class ProductServiceImpl implements ProductService {
                 .build();
     }
 
-    private ProductListDto mapToListDto(Product product) {
-        Inventory inventory = product.getInventory();
-        int inStock = inventory != null ? inventory.getQuantityInStock() : 0;
-        int reserved = inventory != null ? inventory.getQuantityReserved() : 0;
-
-        return ProductListDto.builder()
-                .id(product.getId())
-                .name(product.getName())
-                .sku(product.getSku())
-                .slug(product.getSlug())
-                .basePrice(product.getBasePrice())
-                .salePrice(product.getSalePrice())
-                .status(product.getStatus().name())
-                .category(ProductListDto.CategoryRef.builder()
-                        .id(product.getCategory().getId())
-                        .name(product.getCategory().getName())
-                        .build())
-                .seller(ProductListDto.SellerRef.builder()
-                        .id(product.getSeller().getId())
-                        .name(product.getSeller().getFullName())
-                        .build())
-                .inventory(ProductListDto.InventoryRef.builder()
-                        .quantityInStock(inStock)
-                        .quantityAvailable(inStock - reserved)
-                        .build())
-                .ratingAvg(BigDecimal.ZERO)
-                .build();
-    }
 
     private ProductDetailDto mapToDetailDto(Product product) {
         Inventory inventory = product.getInventory();

@@ -52,4 +52,7 @@ public interface OrderMapper {
     @Mapping(target = "unitPrice", source = "unitPrice")
     @Mapping(target = "subtotal", expression = "java(item.getUnitPrice().multiply(java.math.BigDecimal.valueOf(item.getQuantity())))")
     OrderDetailDto.OrderItemDto toOrderItemDto(OrderItem item);
+
+    @Mapping(target = "itemCount", expression = "java(order.getItems().stream().mapToInt(com.example.tracking_order.modules.order.entity.OrderItem::getQuantity).sum())")
+    OrderListDto toOrderListDto(Order order);
 }

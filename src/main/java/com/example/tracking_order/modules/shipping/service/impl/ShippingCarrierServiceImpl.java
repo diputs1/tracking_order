@@ -9,6 +9,7 @@ import com.example.tracking_order.modules.shipping.repository.ShippingCarrierRep
 import com.example.tracking_order.modules.shipping.service.ShippingCarrierService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,6 +21,7 @@ public class ShippingCarrierServiceImpl implements ShippingCarrierService {
     private final ShippingCarrierRepository carrierRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public List<ShippingCarrierDto> getAllCarriers(Boolean activeOnly) {
         List<ShippingCarrier> carriers = (activeOnly != null && activeOnly) 
             ? carrierRepository.findByIsActiveTrue() 
@@ -35,6 +37,7 @@ public class ShippingCarrierServiceImpl implements ShippingCarrierService {
     }
 
     @Override
+    @Transactional
     public ShippingCarrierDto createCarrier(ShippingCarrierRequest request) {
         ShippingCarrier carrier = ShippingCarrier.builder()
                 .name(request.getName())
@@ -47,6 +50,7 @@ public class ShippingCarrierServiceImpl implements ShippingCarrierService {
     }
 
     @Override
+    @Transactional
     public ShippingCarrierDto updateCarrier(Long id, ShippingCarrierRequest request) {
         ShippingCarrier carrier = carrierRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Đơn vị vận chuyển không tồn tại"));

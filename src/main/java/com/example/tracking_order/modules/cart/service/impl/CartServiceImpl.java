@@ -199,12 +199,8 @@ public class CartServiceImpl implements CartService {
     @Transactional
     public CartDto updateCartItem(Long itemId, UpdateCartItemRequest request) {
         User user = getCurrentUser();
-        CartItem item = cartItemRepository.findById(itemId)
-                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không có trong giỏ"));
-
-        if (!item.getCart().getUser().getId().equals(user.getId())) {
-            throw new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thực hiện hành động này");
-        }
+        CartItem item = cartItemRepository.findByIdAndCartUserId(itemId, user.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thực hiện hành động này hoặc sản phẩm không có trong giỏ"));
                 
         if (request.getQuantity() < 0) {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Số lượng sản phẩm không được nhỏ hơn 0");
@@ -233,12 +229,8 @@ public class CartServiceImpl implements CartService {
     @Transactional
     public CartDto removeCartItem(Long itemId) {
         User user = getCurrentUser();
-        CartItem item = cartItemRepository.findById(itemId)
-                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không có trong giỏ"));
-
-        if (!item.getCart().getUser().getId().equals(user.getId())) {
-            throw new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thực hiện hành động này");
-        }
+        CartItem item = cartItemRepository.findByIdAndCartUserId(itemId, user.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thực hiện hành động này hoặc sản phẩm không có trong giỏ"));
         cartItemRepository.delete(item);
         return getCart();
     }

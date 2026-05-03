@@ -17,6 +17,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -46,6 +47,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public PageData<NotificationDto> getMyNotifications(int page, int size) {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Page<NotificationLog> notifPage = notificationLogRepository.findByUserIdOrderByCreatedAtDesc(
@@ -72,6 +74,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    @Transactional
     public void markAsRead(Long id) {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         

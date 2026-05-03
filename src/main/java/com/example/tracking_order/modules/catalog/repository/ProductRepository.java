@@ -17,15 +17,14 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     
     boolean existsBySku(String sku);
 
-    // Dùng EntityGraph để fetch luôn seller và category để tránh N+1
-    @EntityGraph(attributePaths = {"seller", "category"})
-    Optional<Product> findById(Long id);
-    
     @EntityGraph(attributePaths = {"seller", "category"})
     @Query("SELECT p FROM Product p WHERE p.id = :id")
     Optional<Product> findByIdWithDetails(Long id);
-    @EntityGraph(attributePaths = {"seller", "category", "inventory"})
-    Page<Product> findAll(Specification<Product> spec, Pageable pageable);
+
+    Optional<Product> findByIdAndSellerId(Long id, Long sellerId);
+    
+    @org.springframework.lang.NonNull
+    Page<Product> findAll(@org.springframework.lang.Nullable Specification<Product> spec, @org.springframework.lang.NonNull Pageable pageable);
 
     @Query("SELECT p.id as id, p.name as name, p.sku as sku, p.slug as slug, " +
            "p.basePrice as basePrice, p.salePrice as salePrice, p.status as status, " +

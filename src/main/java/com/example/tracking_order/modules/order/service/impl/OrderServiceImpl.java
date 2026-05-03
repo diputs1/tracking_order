@@ -15,6 +15,7 @@ import com.example.tracking_order.modules.order.repository.OrderRepository;
 import com.example.tracking_order.modules.order.service.OrderService;
 import com.example.tracking_order.modules.notification.service.NotificationService;
 import com.example.tracking_order.modules.notification.enums.NotificationType;
+import com.example.tracking_order.modules.user.entity.User;
 import com.example.tracking_order.modules.user.repository.UserRepository;
 import com.example.tracking_order.security.UserDetailsImpl;
 import lombok.RequiredArgsConstructor;
@@ -39,8 +40,40 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final com.example.tracking_order.modules.order.mapper.OrderMapper orderMapper;
+
+    private User getCurrentUser() {
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return userRepository.findById(userDetails.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED, "Người dùng không tồn tại"));
+    }
+
+    private void checkOrderOwnership(Order order, User user) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        
+        if (!isAdmin && !order.getUser().getId().equals(user.getId())) {
+            throw new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền truy cập đơn hàng này");
+        }
+    }
+
+    private Order getOrderWithOwnerCheck(Long orderId, User user) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        
+        if (isAdmin) {
+            return orderRepository.findById(orderId)
+                    .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Đơn hàng không tồn tại"));
+        } else {
+            return orderRepository.findByIdAndUserId(orderId, user.getId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền truy cập đơn hàng này hoặc đơn hàng không tồn tại"));
+        }
+    }
 
     @Override
+    @Transactional(readOnly = true)
     @LogExecutionTime
     public PageData<OrderListDto> getOrders(Long userId, OrderStatus status, LocalDateTime fromDate, LocalDateTime toDate, int page, int size) {
         Specification<Order> spec = (root, query, cb) -> {
@@ -63,16 +96,9 @@ public class OrderServiceImpl implements OrderService {
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
         Page<Order> orderPage = orderRepository.findAll(spec, pageable);
 
-        List<OrderListDto> items = orderPage.getContent().stream().map(order -> OrderListDto.builder()
-                .id(order.getId())
-                .orderCode(order.getOrderCode())
-                .grandTotal(order.getGrandTotal())
-                .status(order.getStatus().name())
-                .paymentStatus(order.getPaymentStatus().name())
-                .paymentMethod(order.getPaymentMethod().name())
-                .itemCount(order.getItems().stream().mapToInt(OrderItem::getQuantity).sum())
-                .createdAt(order.getCreatedAt())
-                .build()).collect(Collectors.toList());
+        List<OrderListDto> items = orderPage.getContent().stream()
+                .map(orderMapper::toOrderListDto)
+                .collect(Collectors.toList());
 
         PageData.Pagination pagination = PageData.Pagination.builder()
                 .page(page)
@@ -84,51 +110,19 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public OrderDetailDto getOrderDetail(Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Đơn hàng không tồn tại"));
-        
-        List<OrderDetailDto.OrderItemDto> items = order.getItems().stream().map(item -> OrderDetailDto.OrderItemDto.builder()
-                .productId(item.getProduct().getId())
-                .productName(item.getProductName())
-                .productSku(item.getProductSku())
-                .unitPrice(item.getUnitPrice())
-                .quantity(item.getQuantity())
-                .subtotal(item.getSubtotal())
-                .build()).collect(Collectors.toList());
-
-        OrderDetailDto.ShippingInfo shippingInfo = OrderDetailDto.ShippingInfo.builder()
-                .recipientName(order.getReceiverName())
-                .recipientPhone(order.getReceiverPhone())
-                .address(order.getStreet() + ", " + order.getWard() + ", " + order.getDistrict() + ", " + order.getProvince())
-                .carrierName(order.getCarrier() != null ? order.getCarrier().getName() : null)
-                .trackingNumber(order.getTrackingNumber())
-                .trackingUrl(order.getTrackingUrl())
-                .build();
-
-        return OrderDetailDto.builder()
-                .id(order.getId())
-                .orderCode(order.getOrderCode())
-                .status(order.getStatus().name())
-                .paymentStatus(order.getPaymentStatus().name())
-                .paymentMethod(order.getPaymentMethod().name())
-                .subtotal(order.getSubtotal())
-                .discountAmount(order.getDiscountAmount())
-                .shippingFee(order.getShippingFee())
-                .grandTotal(order.getGrandTotal())
-                .shipping(shippingInfo)
-                .items(items)
-                .createdAt(order.getCreatedAt())
-                .updatedAt(order.getUpdatedAt())
-                .build();
+        User user = getCurrentUser();
+        Order order = getOrderWithOwnerCheck(orderId, user);
+        return orderMapper.toOrderDetailDto(order);
     }
 
     @Override
     @Transactional
     @LogExecutionTime
     public OrderDetailDto updateOrderStatus(Long orderId, OrderStatusUpdateRequest request) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Đơn hàng không tồn tại"));
+        User user = getCurrentUser();
+        Order order = getOrderWithOwnerCheck(orderId, user);
         
         order.setStatus(request.getStatus());
         
@@ -158,8 +152,8 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderDetailDto requestReturn(Long orderId, ReturnRequestDto request) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Đơn hàng không tồn tại"));
+        User user = getCurrentUser();
+        Order order = getOrderWithOwnerCheck(orderId, user);
 
         if (order.getStatus() != OrderStatus.DELIVERED) {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Chỉ có thể yêu cầu trả hàng khi đơn đã giao thành công");

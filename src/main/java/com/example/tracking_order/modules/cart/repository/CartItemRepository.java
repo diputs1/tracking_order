@@ -12,8 +12,9 @@ import java.util.Optional;
 public interface CartItemRepository extends JpaRepository<CartItem, Long> {
     Optional<CartItem> findByCartIdAndProductId(Long cartId, Long productId);
     
-    @EntityGraph(attributePaths = {"product", "product.seller"})
     List<CartItem> findByCartId(Long cartId);
+    
+    Optional<CartItem> findByIdAndCartUserId(Long itemId, Long userId);
     
     void deleteByCartId(Long cartId);
 }
