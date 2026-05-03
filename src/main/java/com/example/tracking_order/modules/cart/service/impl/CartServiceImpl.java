@@ -5,9 +5,11 @@ import com.example.tracking_order.common.exception.ErrorCode;
 import com.example.tracking_order.modules.cart.dto.*;
 import com.example.tracking_order.modules.cart.entity.Cart;
 import com.example.tracking_order.modules.cart.entity.CartItem;
+import com.example.tracking_order.modules.cart.mapper.CartMapper;
 import com.example.tracking_order.modules.cart.repository.CartItemRepository;
 import com.example.tracking_order.modules.cart.repository.CartRepository;
 import com.example.tracking_order.modules.cart.service.CartService;
+import com.example.tracking_order.modules.order.mapper.OrderMapper;
 import com.example.tracking_order.modules.catalog.entity.Inventory;
 import com.example.tracking_order.modules.catalog.entity.Product;
 import com.example.tracking_order.modules.catalog.enums.ProductStatus;
@@ -41,6 +43,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,6 +62,8 @@ public class CartServiceImpl implements CartService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
+    private final CartMapper cartMapper;
+    private final OrderMapper orderMapper;
 
     private User getCurrentUser() {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -72,7 +77,7 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public CartDto getCart() {
         User user = getCurrentUser();
         Cart cart = getOrCreateCart(user);
@@ -83,11 +88,19 @@ public class CartServiceImpl implements CartService {
         int totalQty = 0;
         BigDecimal subtotal = BigDecimal.ZERO;
         boolean hasOutOfStock = false;
-        
+        List<Long> idProduct = new ArrayList<>();
+        for(CartItem item : items){
+            idProduct.add(item.getProduct().getId());
+        }
+        List<Inventory> listInventory = inventoryRepository.findByProductIdIn(idProduct);
+        HashMap<Long,Inventory> productIdInventoryMap = new HashMap<>();
+        for(Inventory inventory: listInventory){
+            productIdInventoryMap.put(inventory.getProduct().getId(), inventory);
+        }
         for (CartItem item : items) {
             Product product = item.getProduct();
-            Inventory inventory = inventoryRepository.findByProductId(product.getId()).orElse(null);
-            
+//            Inventory inventory = inventoryRepository.findByProductId(product.getId()).orElse(null);
+            Inventory inventory = productIdInventoryMap.get(product.getId());
             int inStock = inventory != null ? inventory.getQuantityInStock() - inventory.getQuantityReserved() : 0;
             boolean isAvailable = inStock >= item.getQuantity() && product.getStatus() == ProductStatus.ACTIVE;
             
@@ -103,18 +116,7 @@ public class CartServiceImpl implements CartService {
                 subtotal = subtotal.add(itemSubtotal);
             }
             
-            itemDtos.add(CartDto.CartItemDto.builder()
-                    .item_id(item.getId())
-                    .product_id(product.getId())
-                    .product_name(product.getName())
-                    .product_sku(product.getSku())
-                    .price_snapshot(item.getPriceSnapshot())
-                    .current_price(currentPrice)
-                    .quantity(item.getQuantity())
-                    .quantity_in_stock(inStock)
-                    .is_available(isAvailable)
-                    .subtotal(itemSubtotal)
-                    .build());
+            itemDtos.add(cartMapper.toCartItemDto(item, currentPrice, inStock, isAvailable, itemSubtotal));
         }
 
         CartDto.Summary summary = CartDto.Summary.builder()
@@ -124,11 +126,10 @@ public class CartServiceImpl implements CartService {
                 .has_out_of_stock(hasOutOfStock)
                 .build();
 
-        return CartDto.builder()
-                .cart_id(cart.getId())
-                .items(itemDtos)
-                .summary(summary)
-                .build();
+        CartDto cartDto = cartMapper.toCartDto(cart);
+        cartDto.setItems(itemDtos);
+        cartDto.setSummary(summary);
+        return cartDto;
     }
 
     @Override
@@ -144,7 +145,7 @@ public class CartServiceImpl implements CartService {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Sản phẩm ngừng kinh doanh");
         }
         
-        Inventory inventory = inventoryRepository.findByProductId(product.getId())
+        Inventory inventory = inventoryRepository.findByProductIdWithLock(product.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Không có thông tin tồn kho"));
                 
         int available = inventory.getQuantityInStock() - inventory.getQuantityReserved();
@@ -187,7 +188,7 @@ public class CartServiceImpl implements CartService {
             return getCart();
         }
         
-        Inventory inventory = inventoryRepository.findByProductId(item.getProduct().getId())
+        Inventory inventory = inventoryRepository.findByProductIdWithLock(item.getProduct().getId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Không có thông tin tồn kho"));
                 
         int available = inventory.getQuantityInStock() - inventory.getQuantityReserved();
@@ -262,7 +263,7 @@ public class CartServiceImpl implements CartService {
                 throw new AppException(ErrorCode.VALIDATION_ERROR, "Sản phẩm " + product.getName() + " ngừng kinh doanh");
             }
             
-            Inventory inventory = inventoryRepository.findByProductId(product.getId())
+            Inventory inventory = inventoryRepository.findByProductIdWithLock(product.getId())
                     .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Không có thông tin tồn kho cho " + product.getName()));
                     
             int available = inventory.getQuantityInStock() - inventory.getQuantityReserved();
@@ -372,19 +373,6 @@ public class CartServiceImpl implements CartService {
             paymentUrl = "https://payment.sandbox.com/pay/" + orderCode;
         }
         
-        return CheckoutResponse.builder()
-                .order(CheckoutResponse.OrderSummary.builder()
-                        .id(order.getId())
-                        .order_code(order.getOrderCode())
-                        .status(order.getStatus().name())
-                        .payment_status(payment.getStatus().name())
-                        .subtotal(order.getSubtotal())
-                        .discount_amount(order.getDiscountAmount())
-                        .shipping_fee(order.getShippingFee())
-                        .grand_total(order.getGrandTotal())
-                        .estimated_delivery_at(LocalDateTime.now().plusDays(3))
-                        .build())
-                .payment_url(paymentUrl)
-                .build();
+        return orderMapper.toCheckoutResponse(order, payment, paymentUrl);
     }
 }

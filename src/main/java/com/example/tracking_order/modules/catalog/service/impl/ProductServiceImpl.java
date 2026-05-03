@@ -80,10 +80,10 @@ public class ProductServiceImpl implements ProductService {
         else if ("newest".equals(sort)) sortOrder = Sort.by("createdAt").descending();
 
         Pageable pageable = PageRequest.of(page - 1, size, sortOrder);
-        Page<Product> productPage = productRepository.findAll(spec, pageable);
+        Page<com.example.tracking_order.modules.catalog.dto.ProductProjection> productPage = productRepository.findAllProjected(spec, pageable);
 
         List<ProductListDto> items = productPage.getContent().stream()
-                .map(this::mapToListDto)
+                .map(this::mapProjectionToDto)
                 .collect(Collectors.toList());
 
         PageData.Pagination pagination = PageData.Pagination.builder()
@@ -182,8 +182,36 @@ public class ProductServiceImpl implements ProductService {
         return mapToInventoryDto(inventory);
     }
 
+    private ProductListDto mapProjectionToDto(com.example.tracking_order.modules.catalog.dto.ProductProjection projection) {
+        int inStock = projection.getQuantityInStock() != null ? projection.getQuantityInStock() : 0;
+        int reserved = projection.getQuantityReserved() != null ? projection.getQuantityReserved() : 0;
+
+        return ProductListDto.builder()
+                .id(projection.getId())
+                .name(projection.getName())
+                .sku(projection.getSku())
+                .slug(projection.getSlug())
+                .base_price(projection.getBasePrice())
+                .sale_price(projection.getSalePrice())
+                .status(projection.getStatus())
+                .category(ProductListDto.CategoryRef.builder()
+                        .id(projection.getCategoryId())
+                        .name(projection.getCategoryName())
+                        .build())
+                .seller(ProductListDto.SellerRef.builder()
+                        .id(projection.getSellerId())
+                        .name(projection.getSellerFullName())
+                        .build())
+                .inventory(ProductListDto.InventoryRef.builder()
+                        .quantity_in_stock(inStock)
+                        .quantity_available(inStock - reserved)
+                        .build())
+                .rating_avg(BigDecimal.ZERO)
+                .build();
+    }
+
     private ProductListDto mapToListDto(Product product) {
-        Inventory inventory = inventoryRepository.findByProductId(product.getId()).orElse(null);
+        Inventory inventory = product.getInventory();
         int inStock = inventory != null ? inventory.getQuantityInStock() : 0;
         int reserved = inventory != null ? inventory.getQuantityReserved() : 0;
 
@@ -212,7 +240,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductDetailDto mapToDetailDto(Product product) {
-        Inventory inventory = inventoryRepository.findByProductId(product.getId()).orElse(null);
+        Inventory inventory = product.getInventory();
         int inStock = inventory != null ? inventory.getQuantityInStock() : 0;
         int reserved = inventory != null ? inventory.getQuantityReserved() : 0;
 

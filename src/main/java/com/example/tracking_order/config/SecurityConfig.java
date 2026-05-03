@@ -56,6 +56,7 @@ public class SecurityConfig {
                         auth.requestMatchers("/api/v1/auth/**").permitAll()
                             .requestMatchers("/api/v1/products/**").permitAll() // Products list can be public
                             .requestMatchers("/api/v1/categories/**").permitAll()
+                            .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                             .anyRequest().authenticated()
                 );
 

@@ -1,0 +1,31 @@
+package com.example.tracking_order.modules.cart.mapper;
+
+import com.example.tracking_order.modules.cart.dto.CartDto;
+import com.example.tracking_order.modules.cart.entity.Cart;
+import com.example.tracking_order.modules.cart.entity.CartItem;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
+
+import java.math.BigDecimal;
+
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+public interface CartMapper {
+
+    @Mapping(target = "cart_id", source = "id")
+    @Mapping(target = "items", ignore = true) // Handled manually in service or by another method
+    @Mapping(target = "summary", ignore = true)
+    CartDto toCartDto(Cart cart);
+
+    @Mapping(target = "item_id", source = "item.id")
+    @Mapping(target = "product_id", source = "item.product.id")
+    @Mapping(target = "product_name", source = "item.product.name")
+    @Mapping(target = "product_sku", source = "item.product.sku")
+    @Mapping(target = "price_snapshot", source = "item.priceSnapshot")
+    @Mapping(target = "quantity", source = "item.quantity")
+    @Mapping(target = "current_price", source = "currentPrice")
+    @Mapping(target = "quantity_in_stock", source = "inStock")
+    @Mapping(target = "is_available", source = "isAvailable")
+    @Mapping(target = "subtotal", source = "itemSubtotal")
+    CartDto.CartItemDto toCartItemDto(CartItem item, BigDecimal currentPrice, Integer inStock, Boolean isAvailable, BigDecimal itemSubtotal);
+}
