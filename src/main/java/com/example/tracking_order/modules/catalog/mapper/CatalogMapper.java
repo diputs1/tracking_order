@@ -13,27 +13,27 @@ import org.mapstruct.ReportingPolicy;
 public interface CatalogMapper {
 
     @Mapping(target = "id", source = "product.id")
-    @Mapping(target = "base_price", source = "product.basePrice")
-    @Mapping(target = "sale_price", source = "product.salePrice")
+    @Mapping(target = "basePrice", source = "product.basePrice")
+    @Mapping(target = "salePrice", source = "product.salePrice")
     @Mapping(target = "inventory", source = "inventory")
     @Mapping(target = "category", source = "product.category")
     @Mapping(target = "seller", source = "product.seller")
     ProductListDto toProductListDto(Product product, Inventory inventory);
 
     @Mapping(target = "id", source = "product.id")
-    @Mapping(target = "base_price", source = "product.basePrice")
-    @Mapping(target = "sale_price", source = "product.salePrice")
+    @Mapping(target = "basePrice", source = "product.basePrice")
+    @Mapping(target = "salePrice", source = "product.salePrice")
     @Mapping(target = "inventory", source = "inventory")
     @Mapping(target = "category", source = "product.category")
     @Mapping(target = "seller", source = "product.seller")
     ProductDetailDto toProductDetailDto(Product product, Inventory inventory);
 
-    @Mapping(target = "quantity_in_stock", source = "quantityInStock")
-    @Mapping(target = "quantity_available", expression = "java(inventory.getQuantityInStock() - inventory.getQuantityReserved())")
+    @Mapping(target = "quantityInStock", source = "quantityInStock")
+    @Mapping(target = "quantityAvailable", expression = "java(inventory.getQuantityInStock() - inventory.getQuantityReserved())")
     ProductListDto.InventoryRef toInventoryRefList(Inventory inventory);
 
-    @Mapping(target = "quantity_in_stock", source = "quantityInStock")
-    @Mapping(target = "quantity_available", expression = "java(inventory.getQuantityInStock() - inventory.getQuantityReserved())")
+    @Mapping(target = "quantityInStock", source = "quantityInStock")
+    @Mapping(target = "quantityAvailable", expression = "java(inventory.getQuantityInStock() - inventory.getQuantityReserved())")
     ProductDetailDto.InventoryRef toInventoryRefDetail(Inventory inventory);
 
     ProductListDto.CategoryRef toCategoryRefList(Category category);

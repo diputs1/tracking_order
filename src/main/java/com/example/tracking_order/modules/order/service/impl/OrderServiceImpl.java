@@ -65,19 +65,19 @@ public class OrderServiceImpl implements OrderService {
 
         List<OrderListDto> items = orderPage.getContent().stream().map(order -> OrderListDto.builder()
                 .id(order.getId())
-                .order_code(order.getOrderCode())
-                .grand_total(order.getGrandTotal())
+                .orderCode(order.getOrderCode())
+                .grandTotal(order.getGrandTotal())
                 .status(order.getStatus().name())
-                .payment_status(order.getPaymentStatus().name())
-                .payment_method(order.getPaymentMethod().name())
-                .item_count(order.getItems().stream().mapToInt(OrderItem::getQuantity).sum())
-                .created_at(order.getCreatedAt())
+                .paymentStatus(order.getPaymentStatus().name())
+                .paymentMethod(order.getPaymentMethod().name())
+                .itemCount(order.getItems().stream().mapToInt(OrderItem::getQuantity).sum())
+                .createdAt(order.getCreatedAt())
                 .build()).collect(Collectors.toList());
 
         PageData.Pagination pagination = PageData.Pagination.builder()
                 .page(page)
-                .total_pages(orderPage.getTotalPages())
-                .total_items(orderPage.getTotalElements())
+                .totalPages(orderPage.getTotalPages())
+                .totalItems(orderPage.getTotalElements())
                 .build();
 
         return PageData.<OrderListDto>builder().items(items).pagination(pagination).build();
@@ -89,37 +89,37 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Đơn hàng không tồn tại"));
         
         List<OrderDetailDto.OrderItemDto> items = order.getItems().stream().map(item -> OrderDetailDto.OrderItemDto.builder()
-                .product_id(item.getProduct().getId())
-                .product_name(item.getProductName())
-                .product_sku(item.getProductSku())
-                .unit_price(item.getUnitPrice())
+                .productId(item.getProduct().getId())
+                .productName(item.getProductName())
+                .productSku(item.getProductSku())
+                .unitPrice(item.getUnitPrice())
                 .quantity(item.getQuantity())
                 .subtotal(item.getSubtotal())
                 .build()).collect(Collectors.toList());
 
         OrderDetailDto.ShippingInfo shippingInfo = OrderDetailDto.ShippingInfo.builder()
-                .recipient_name(order.getReceiverName())
-                .recipient_phone(order.getReceiverPhone())
+                .recipientName(order.getReceiverName())
+                .recipientPhone(order.getReceiverPhone())
                 .address(order.getStreet() + ", " + order.getWard() + ", " + order.getDistrict() + ", " + order.getProvince())
-                .carrier_name(order.getCarrier() != null ? order.getCarrier().getName() : null)
-                .tracking_number(order.getTrackingNumber())
-                .tracking_url(order.getTrackingUrl())
+                .carrierName(order.getCarrier() != null ? order.getCarrier().getName() : null)
+                .trackingNumber(order.getTrackingNumber())
+                .trackingUrl(order.getTrackingUrl())
                 .build();
 
         return OrderDetailDto.builder()
                 .id(order.getId())
-                .order_code(order.getOrderCode())
+                .orderCode(order.getOrderCode())
                 .status(order.getStatus().name())
-                .payment_status(order.getPaymentStatus().name())
-                .payment_method(order.getPaymentMethod().name())
+                .paymentStatus(order.getPaymentStatus().name())
+                .paymentMethod(order.getPaymentMethod().name())
                 .subtotal(order.getSubtotal())
-                .discount_amount(order.getDiscountAmount())
-                .shipping_fee(order.getShippingFee())
-                .grand_total(order.getGrandTotal())
+                .discountAmount(order.getDiscountAmount())
+                .shippingFee(order.getShippingFee())
+                .grandTotal(order.getGrandTotal())
                 .shipping(shippingInfo)
                 .items(items)
-                .created_at(order.getCreatedAt())
-                .updated_at(order.getUpdatedAt())
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
                 .build();
     }
 

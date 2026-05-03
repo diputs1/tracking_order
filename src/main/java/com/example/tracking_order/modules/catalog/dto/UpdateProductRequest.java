@@ -1,5 +1,6 @@
 package com.example.tracking_order.modules.catalog.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.example.tracking_order.modules.catalog.enums.ProductStatus;
 import lombok.Data;
 
@@ -9,8 +10,10 @@ import java.util.List;
 @Data
 public class UpdateProductRequest {
     private String name;
-    private BigDecimal base_price;
-    private BigDecimal sale_price;
+    @JsonProperty("base_price")
+    private BigDecimal basePrice;
+    @JsonProperty("sale_price")
+    private BigDecimal salePrice;
     private String description;
     private ProductStatus status;
     private List<String> images;

@@ -46,15 +46,15 @@ public class AuthServiceImpl implements AuthService {
                     .collect(Collectors.toList());
 
             return LoginResponse.builder()
-                    .access_token(jwt)
-                    .refresh_token(refreshToken)
-                    .token_type("Bearer")
+                    .accessToken(jwt)
+                    .refreshToken(refreshToken)
+                    .tokenType("Bearer")
                     .user(LoginResponse.UserDto.builder()
                             .id(userDetails.getId())
                             .email(userDetails.getUsername())
-                            .full_name(userDetails.getFullName())
+                            .fullName(userDetails.getFullName())
                             .roles(roles)
-                            .avatar_url(userDetails.getAvatarUrl())
+                            .avatarUrl(userDetails.getAvatarUrl())
                             .build())
                     .build();
         } catch (AuthenticationException e) {

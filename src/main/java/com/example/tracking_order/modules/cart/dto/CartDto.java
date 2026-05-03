@@ -1,5 +1,6 @@
 package com.example.tracking_order.modules.cart.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -16,25 +17,37 @@ public class CartDto {
     @Data
     @Builder
     public static class CartItemDto {
-        private Long item_id;
-        private Long product_id;
-        private String product_name;
-        private String product_image;
-        private String product_sku;
-        private BigDecimal price_snapshot;
-        private BigDecimal current_price;
+        @JsonProperty("item_id")
+        private Long itemId;
+        @JsonProperty("product_id")
+        private Long productId;
+        @JsonProperty("product_name")
+        private String productName;
+        @JsonProperty("product_image")
+        private String productImage;
+        @JsonProperty("product_sku")
+        private String productSku;
+        @JsonProperty("price_snapshot")
+        private BigDecimal priceSnapshot;
+        @JsonProperty("current_price")
+        private BigDecimal currentPrice;
         private Integer quantity;
-        private Integer quantity_in_stock;
-        private Boolean is_available;
+        @JsonProperty("quantity_in_stock")
+        private Integer quantityInStock;
+        @JsonProperty("is_available")
+        private Boolean isAvailable;
         private BigDecimal subtotal;
     }
 
     @Data
     @Builder
     public static class Summary {
-        private Integer item_count;
-        private Integer total_qty;
+        @JsonProperty("item_count")
+        private Integer itemCount;
+        @JsonProperty("total_qty")
+        private Integer totalQty;
         private BigDecimal subtotal;
-        private Boolean has_out_of_stock;
+        @JsonProperty("has_out_of_stock")
+        private Boolean hasOutOfStock;
     }
 }

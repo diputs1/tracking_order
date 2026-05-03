@@ -1,5 +1,6 @@
 package com.example.tracking_order.modules.order.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -10,11 +11,17 @@ import java.time.LocalDateTime;
 @Builder
 public class OrderListDto {
     private Long id;
-    private String order_code;
-    private BigDecimal grand_total;
+    @JsonProperty("order_code")
+    private String orderCode;
+    @JsonProperty("grand_total")
+    private BigDecimal grandTotal;
     private String status;
-    private String payment_status;
-    private String payment_method;
-    private Integer item_count;
-    private LocalDateTime created_at;
+    @JsonProperty("payment_status")
+    private String paymentStatus;
+    @JsonProperty("payment_method")
+    private String paymentMethod;
+    @JsonProperty("item_count")
+    private Integer itemCount;
+    @JsonProperty("created_at")
+    private LocalDateTime createdAt;
 }

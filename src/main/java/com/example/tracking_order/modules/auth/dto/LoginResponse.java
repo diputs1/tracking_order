@@ -1,5 +1,6 @@
 package com.example.tracking_order.modules.auth.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -8,18 +9,23 @@ import java.util.List;
 @Data
 @Builder
 public class LoginResponse {
-    private String access_token;
-    private String refresh_token;
-    private String token_type;
+    @JsonProperty("access_token")
+    private String accessToken;
+    @JsonProperty("refresh_token")
+    private String refreshToken;
+    @JsonProperty("token_type")
+    private String tokenType;
     private UserDto user;
 
     @Data
     @Builder
     public static class UserDto {
         private Long id;
-        private String full_name;
+        @JsonProperty("full_name")
+        private String fullName;
         private String email;
         private List<String> roles;
-        private String avatar_url;
+        @JsonProperty("avatar_url")
+        private String avatarUrl;
     }
 }

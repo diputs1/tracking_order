@@ -1,5 +1,6 @@
 package com.example.tracking_order.modules.catalog.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.example.tracking_order.modules.catalog.enums.ProductStatus;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -18,19 +19,23 @@ public class CreateProductRequest {
     private String sku;
 
     @NotNull(message = "Danh mục không được để trống")
-    private Long category_id;
+    @JsonProperty("category_id")
+    private Long categoryId;
 
     @NotNull(message = "Giá gốc không được để trống")
     @Min(value = 0, message = "Giá gốc không hợp lệ")
-    private BigDecimal base_price;
+    @JsonProperty("base_price")
+    private BigDecimal basePrice;
 
-    private BigDecimal sale_price;
+    @JsonProperty("sale_price")
+    private BigDecimal salePrice;
     private String description;
     private BigDecimal weight;
 
     @NotNull(message = "Tồn kho ban đầu không được để trống")
     @Min(value = 0, message = "Tồn kho không hợp lệ")
-    private Integer initial_stock;
+    @JsonProperty("initial_stock")
+    private Integer initialStock;
 
     private List<String> images;
     private ProductStatus status;

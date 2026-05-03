@@ -1,5 +1,6 @@
 package com.example.tracking_order.modules.order.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -11,37 +12,54 @@ import java.util.List;
 @Builder
 public class OrderDetailDto {
     private Long id;
-    private String order_code;
+    @JsonProperty("order_code")
+    private String orderCode;
     private String status;
-    private String payment_status;
-    private String payment_method;
+    @JsonProperty("payment_status")
+    private String paymentStatus;
+    @JsonProperty("payment_method")
+    private String paymentMethod;
     private BigDecimal subtotal;
-    private BigDecimal discount_amount;
-    private BigDecimal shipping_fee;
-    private BigDecimal grand_total;
+    @JsonProperty("discount_amount")
+    private BigDecimal discountAmount;
+    @JsonProperty("shipping_fee")
+    private BigDecimal shippingFee;
+    @JsonProperty("grand_total")
+    private BigDecimal grandTotal;
     private ShippingInfo shipping;
     private List<OrderItemDto> items;
-    private LocalDateTime created_at;
-    private LocalDateTime updated_at;
+    @JsonProperty("created_at")
+    private LocalDateTime createdAt;
+    @JsonProperty("updated_at")
+    private LocalDateTime updatedAt;
 
     @Data
     @Builder
     public static class ShippingInfo {
-        private String recipient_name;
-        private String recipient_phone;
+        @JsonProperty("recipient_name")
+        private String recipientName;
+        @JsonProperty("recipient_phone")
+        private String recipientPhone;
         private String address;
-        private String carrier_name;
-        private String tracking_number;
-        private String tracking_url;
+        @JsonProperty("carrier_name")
+        private String carrierName;
+        @JsonProperty("tracking_number")
+        private String trackingNumber;
+        @JsonProperty("tracking_url")
+        private String trackingUrl;
     }
 
     @Data
     @Builder
     public static class OrderItemDto {
-        private Long product_id;
-        private String product_name;
-        private String product_sku;
-        private BigDecimal unit_price;
+        @JsonProperty("product_id")
+        private Long productId;
+        @JsonProperty("product_name")
+        private String productName;
+        @JsonProperty("product_sku")
+        private String productSku;
+        @JsonProperty("unit_price")
+        private BigDecimal unitPrice;
         private Integer quantity;
         private BigDecimal subtotal;
     }

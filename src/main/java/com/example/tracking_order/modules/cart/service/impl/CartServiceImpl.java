@@ -120,10 +120,10 @@ public class CartServiceImpl implements CartService {
         }
 
         CartDto.Summary summary = CartDto.Summary.builder()
-                .item_count(items.size())
-                .total_qty(totalQty)
+                .itemCount(items.size())
+                .totalQty(totalQty)
                 .subtotal(subtotal)
-                .has_out_of_stock(hasOutOfStock)
+                .hasOutOfStock(hasOutOfStock)
                 .build();
 
         CartDto cartDto = cartMapper.toCartDto(cart);
@@ -138,7 +138,7 @@ public class CartServiceImpl implements CartService {
         User user = getCurrentUser();
         Cart cart = getOrCreateCart(user);
         
-        Product product = productRepository.findById(request.getProduct_id())
+        Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không tồn tại"));
                 
         if (product.getStatus() != ProductStatus.ACTIVE) {
@@ -222,8 +222,8 @@ public class CartServiceImpl implements CartService {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Giỏ hàng trống");
         }
         
-        return processCheckout(user, cartItems, request.getAddress_id(), request.getCarrier_id(), 
-                request.getPayment_method(), request.getDiscount_code(), request.getNote(), cart.getId());
+        return processCheckout(user, cartItems, request.getAddressId(), request.getCarrierId(), 
+                request.getPaymentMethod(), request.getDiscountCode(), request.getNote(), cart.getId());
     }
     
     @Override
@@ -231,7 +231,7 @@ public class CartServiceImpl implements CartService {
     public CheckoutResponse quickCheckout(QuickCheckoutRequest request) {
         User user = getCurrentUser();
         
-        Product product = productRepository.findById(request.getProduct_id())
+        Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không tồn tại"));
                 
         CartItem mockItem = CartItem.builder()
@@ -242,8 +242,8 @@ public class CartServiceImpl implements CartService {
                 
         List<CartItem> items = List.of(mockItem);
         
-        return processCheckout(user, items, request.getAddress_id(), request.getCarrier_id(), 
-                request.getPayment_method(), request.getDiscount_code(), null, null);
+        return processCheckout(user, items, request.getAddressId(), request.getCarrierId(), 
+                request.getPaymentMethod(), request.getDiscountCode(), null, null);
     }
 
     private CheckoutResponse processCheckout(User user, List<CartItem> items, Long addressId, Long carrierId, 

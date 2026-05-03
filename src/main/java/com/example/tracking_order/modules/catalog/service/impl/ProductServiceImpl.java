@@ -88,8 +88,8 @@ public class ProductServiceImpl implements ProductService {
 
         PageData.Pagination pagination = PageData.Pagination.builder()
                 .page(page)
-                .total_pages(productPage.getTotalPages())
-                .total_items(productPage.getTotalElements())
+                .totalPages(productPage.getTotalPages())
+                .totalItems(productPage.getTotalElements())
                 .build();
 
         return PageData.<ProductListDto>builder()
@@ -105,7 +105,7 @@ public class ProductServiceImpl implements ProductService {
             throw new AppException(ErrorCode.DUPLICATE_SKU, "Mã SKU đã tồn tại");
         }
 
-        Category category = categoryRepository.findById(request.getCategory_id())
+        Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Danh mục không tồn tại"));
 
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -118,8 +118,8 @@ public class ProductServiceImpl implements ProductService {
                 .name(request.getName())
                 .sku(request.getSku())
                 .slug(slug)
-                .basePrice(request.getBase_price())
-                .salePrice(request.getSale_price())
+                .basePrice(request.getBasePrice())
+                .salePrice(request.getSalePrice())
                 .description(request.getDescription())
                 .weight(request.getWeight() != null ? request.getWeight() : BigDecimal.ZERO)
                 .status(request.getStatus() != null ? request.getStatus() : ProductStatus.ACTIVE)
@@ -131,7 +131,7 @@ public class ProductServiceImpl implements ProductService {
 
         Inventory inventory = Inventory.builder()
                 .product(product)
-                .quantityInStock(request.getInitial_stock())
+                .quantityInStock(request.getInitialStock())
                 .quantityReserved(0)
                 .build();
         inventoryRepository.save(inventory);
@@ -153,8 +153,8 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không tồn tại"));
 
         if (request.getName() != null) product.setName(request.getName());
-        if (request.getBase_price() != null) product.setBasePrice(request.getBase_price());
-        if (request.getSale_price() != null) product.setSalePrice(request.getSale_price());
+        if (request.getBasePrice() != null) product.setBasePrice(request.getBasePrice());
+        if (request.getSalePrice() != null) product.setSalePrice(request.getSalePrice());
         if (request.getDescription() != null) product.setDescription(request.getDescription());
         if (request.getStatus() != null) product.setStatus(request.getStatus());
         if (request.getWeight() != null) product.setWeight(request.getWeight());
@@ -176,7 +176,7 @@ public class ProductServiceImpl implements ProductService {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không có kho"));
 
-        inventory.setQuantityInStock(request.getQuantity_in_stock());
+        inventory.setQuantityInStock(request.getQuantityInStock());
         inventoryRepository.save(inventory);
 
         return mapToInventoryDto(inventory);
@@ -191,8 +191,8 @@ public class ProductServiceImpl implements ProductService {
                 .name(projection.getName())
                 .sku(projection.getSku())
                 .slug(projection.getSlug())
-                .base_price(projection.getBasePrice())
-                .sale_price(projection.getSalePrice())
+                .basePrice(projection.getBasePrice())
+                .salePrice(projection.getSalePrice())
                 .status(projection.getStatus())
                 .category(ProductListDto.CategoryRef.builder()
                         .id(projection.getCategoryId())
@@ -203,10 +203,10 @@ public class ProductServiceImpl implements ProductService {
                         .name(projection.getSellerFullName())
                         .build())
                 .inventory(ProductListDto.InventoryRef.builder()
-                        .quantity_in_stock(inStock)
-                        .quantity_available(inStock - reserved)
+                        .quantityInStock(inStock)
+                        .quantityAvailable(inStock - reserved)
                         .build())
-                .rating_avg(BigDecimal.ZERO)
+                .ratingAvg(BigDecimal.ZERO)
                 .build();
     }
 
@@ -220,8 +220,8 @@ public class ProductServiceImpl implements ProductService {
                 .name(product.getName())
                 .sku(product.getSku())
                 .slug(product.getSlug())
-                .base_price(product.getBasePrice())
-                .sale_price(product.getSalePrice())
+                .basePrice(product.getBasePrice())
+                .salePrice(product.getSalePrice())
                 .status(product.getStatus().name())
                 .category(ProductListDto.CategoryRef.builder()
                         .id(product.getCategory().getId())
@@ -232,10 +232,10 @@ public class ProductServiceImpl implements ProductService {
                         .name(product.getSeller().getFullName())
                         .build())
                 .inventory(ProductListDto.InventoryRef.builder()
-                        .quantity_in_stock(inStock)
-                        .quantity_available(inStock - reserved)
+                        .quantityInStock(inStock)
+                        .quantityAvailable(inStock - reserved)
                         .build())
-                .rating_avg(BigDecimal.ZERO)
+                .ratingAvg(BigDecimal.ZERO)
                 .build();
     }
 
@@ -250,8 +250,8 @@ public class ProductServiceImpl implements ProductService {
                 .sku(product.getSku())
                 .slug(product.getSlug())
                 .description(product.getDescription())
-                .base_price(product.getBasePrice())
-                .sale_price(product.getSalePrice())
+                .basePrice(product.getBasePrice())
+                .salePrice(product.getSalePrice())
                 .weight(product.getWeight())
                 .status(product.getStatus().name())
                 .category(ProductDetailDto.CategoryRef.builder()
@@ -264,11 +264,11 @@ public class ProductServiceImpl implements ProductService {
                         .name(product.getSeller().getFullName())
                         .build())
                 .inventory(ProductDetailDto.InventoryRef.builder()
-                        .quantity_in_stock(inStock)
-                        .quantity_available(inStock - reserved)
+                        .quantityInStock(inStock)
+                        .quantityAvailable(inStock - reserved)
                         .build())
-                .rating_avg(BigDecimal.ZERO)
-                .review_count(0)
+                .ratingAvg(BigDecimal.ZERO)
+                .reviewCount(0)
                 .build();
     }
 
@@ -278,12 +278,12 @@ public class ProductServiceImpl implements ProductService {
         int available = inStock - reserved;
 
         return InventoryDto.builder()
-                .product_id(inventory.getProduct().getId())
-                .quantity_in_stock(inStock)
-                .quantity_reserved(reserved)
-                .quantity_available(available)
-                .is_available(available > 0)
-                .updated_at(inventory.getUpdatedAt())
+                .productId(inventory.getProduct().getId())
+                .quantityInStock(inStock)
+                .quantityReserved(reserved)
+                .quantityAvailable(available)
+                .isAvailable(available > 0)
+                .updatedAt(inventory.getUpdatedAt())
                 .build();
     }
 

@@ -56,16 +56,16 @@ public class NotificationServiceImpl implements NotificationService {
                 .title(n.getTitle())
                 .message(n.getMessage())
                 .type(n.getType().name())
-                .related_entity_type(n.getRelatedEntityType())
-                .related_entity_id(n.getRelatedEntityId())
-                .is_read(n.getIsRead())
-                .created_at(n.getCreatedAt())
+                .relatedEntityType(n.getRelatedEntityType())
+                .relatedEntityId(n.getRelatedEntityId())
+                .isRead(n.getIsRead())
+                .createdAt(n.getCreatedAt())
                 .build()).collect(Collectors.toList());
 
         PageData.Pagination pagination = PageData.Pagination.builder()
                 .page(page)
-                .total_pages(notifPage.getTotalPages())
-                .total_items(notifPage.getTotalElements())
+                .totalPages(notifPage.getTotalPages())
+                .totalItems(notifPage.getTotalElements())
                 .build();
 
         return PageData.<NotificationDto>builder().items(items).pagination(pagination).build();

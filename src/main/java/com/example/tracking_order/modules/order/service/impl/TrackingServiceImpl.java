@@ -40,7 +40,7 @@ public class TrackingServiceImpl implements TrackingService {
 
         TrackingLog trackingLog = TrackingLog.builder()
                 .order(order)
-                .eventType(request.getEvent_type())
+                .eventType(request.getEventType())
                 .location(request.getLocation())
                 .note(request.getNote())
                 .updatedBy(loggedBy)
@@ -51,14 +51,14 @@ public class TrackingServiceImpl implements TrackingService {
 
         return TrackingLogDto.builder()
                 .id(trackingLog.getId())
-                .event_type(trackingLog.getEventType().name())
+                .eventType(trackingLog.getEventType().name())
                 .location(trackingLog.getLocation())
                 .note(trackingLog.getNote())
-                .logged_by(TrackingLogDto.UserRef.builder()
+                .loggedBy(TrackingLogDto.UserRef.builder()
                         .id(loggedBy.getId())
                         .name(loggedBy.getFullName())
                         .build())
-                .created_at(trackingLog.getCreatedAt())
+                .createdAt(trackingLog.getCreatedAt())
                 .build();
     }
 
@@ -72,14 +72,14 @@ public class TrackingServiceImpl implements TrackingService {
 
         return logs.stream().map(log -> TrackingLogDto.builder()
                 .id(log.getId())
-                .event_type(log.getEventType().name())
+                .eventType(log.getEventType().name())
                 .location(log.getLocation())
                 .note(log.getNote())
-                .logged_by(TrackingLogDto.UserRef.builder()
+                .loggedBy(TrackingLogDto.UserRef.builder()
                         .id(log.getUpdatedBy().getId())
                         .name(log.getUpdatedBy().getFullName())
                         .build())
-                .created_at(log.getCreatedAt())
+                .createdAt(log.getCreatedAt())
                 .build()).collect(Collectors.toList());
     }
 }

@@ -1,5 +1,6 @@
 package com.example.tracking_order.common.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,7 +22,11 @@ public class PageData<T> {
     @AllArgsConstructor
     public static class Pagination {
         private int page;
-        private int total_pages;
-        private long total_items;
+        
+        @JsonProperty("total_pages")
+        private int totalPages;
+        
+        @JsonProperty("total_items")
+        private long totalItems;
     }
 }
