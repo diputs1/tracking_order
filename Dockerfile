@@ -20,13 +20,13 @@ COPY --from=build /app/target/*.jar app.jar
 # Expose port
 EXPOSE 8080
 
-# Environment variables with default values
+# Default environment variables (can be overridden)
 ENV DB_HOST=localhost \
     DB_PORT=3306 \
     DB_NAME=tracking_order \
     DB_USER=root \
-    DB_PASSWORD=password \
-    JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970 \
+    DB_PASSWORD="" \
+    JWT_SECRET="" \
     JWT_EXPIRATION=86400000
 
 # Run the application

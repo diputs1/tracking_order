@@ -54,10 +54,14 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> 
                         auth.requestMatchers("/api/v1/auth/**").permitAll()
-                            .requestMatchers("/api/v1/products/**").permitAll() // Products list can be public
+                            .requestMatchers("/api/v1/products/**").permitAll()
                             .requestMatchers("/api/v1/categories/**").permitAll()
                             .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                             .anyRequest().authenticated()
+                )
+                .headers(headers -> headers
+                        .frameOptions(frameOptions -> frameOptions.deny())
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
                 );
 
         http.authenticationProvider(authenticationProvider());

@@ -28,9 +28,30 @@ public class TrackingServiceImpl implements TrackingService {
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
 
+    private void checkOrderPermission(Long orderId) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isShipper = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SHIPPER"));
+
+        if (isAdmin || isShipper) {
+            return;
+        }
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Đơn hàng không tồn tại"));
+
+        if (!order.getUser().getId().equals(userDetails.getId())) {
+            throw new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền truy cập thông tin vận chuyển của đơn hàng này");
+        }
+    }
+
     @Override
     @Transactional
     public TrackingLogDto addTrackingLog(Long orderId, CreateTrackingLogRequest request) {
+        checkOrderPermission(orderId);
+        
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Đơn hàng không tồn tại"));
 
@@ -64,6 +85,8 @@ public class TrackingServiceImpl implements TrackingService {
 
     @Override
     public List<TrackingLogDto> getTrackingLogs(Long orderId) {
+        checkOrderPermission(orderId);
+        
         if (!orderRepository.existsById(orderId)) {
             throw new AppException(ErrorCode.NOT_FOUND, "Đơn hàng không tồn tại");
         }
