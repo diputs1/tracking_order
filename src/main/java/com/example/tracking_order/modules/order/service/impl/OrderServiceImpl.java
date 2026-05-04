@@ -4,15 +4,12 @@ import com.example.tracking_order.common.annotation.LogExecutionTime;
 import com.example.tracking_order.common.exception.AppException;
 import com.example.tracking_order.common.exception.ErrorCode;
 import com.example.tracking_order.common.response.PageData;
-import com.example.tracking_order.modules.order.dto.OrderDetailDto;
-import com.example.tracking_order.modules.order.dto.OrderListDto;
-import com.example.tracking_order.modules.order.dto.OrderStatusUpdateRequest;
-import com.example.tracking_order.modules.order.dto.ReturnRequestDto;
+import com.example.tracking_order.modules.order.dto.*;
 import com.example.tracking_order.modules.order.entity.Order;
-import com.example.tracking_order.modules.order.entity.OrderItem;
 import com.example.tracking_order.modules.order.enums.OrderStatus;
 import com.example.tracking_order.modules.order.repository.OrderRepository;
 import com.example.tracking_order.modules.order.service.OrderService;
+import com.example.tracking_order.modules.order.specification.OrderSpecification;
 import com.example.tracking_order.modules.notification.service.NotificationService;
 import com.example.tracking_order.modules.notification.enums.NotificationType;
 import com.example.tracking_order.modules.user.entity.User;
@@ -29,7 +26,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -46,16 +42,6 @@ public class OrderServiceImpl implements OrderService {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED, "Người dùng không tồn tại"));
-    }
-
-    private void checkOrderOwnership(Order order, User user) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        boolean isAdmin = userDetails.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        
-        if (!isAdmin && !order.getUser().getId().equals(user.getId())) {
-            throw new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền truy cập đơn hàng này");
-        }
     }
 
     private Order getOrderWithOwnerCheck(Long orderId, User user) {
@@ -75,25 +61,10 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     @LogExecutionTime
-    public PageData<OrderListDto> getOrders(Long userId, OrderStatus status, LocalDateTime fromDate, LocalDateTime toDate, int page, int size) {
-        Specification<Order> spec = (root, query, cb) -> {
-            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
-            if (userId != null) {
-                predicates.add(cb.equal(root.get("user").get("id"), userId));
-            }
-            if (status != null) {
-                predicates.add(cb.equal(root.get("status"), status));
-            }
-            if (fromDate != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), fromDate));
-            }
-            if (toDate != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), toDate));
-            }
-            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
-        };
-
-        Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
+    public PageData<OrderListDto> getOrders(OrderSearchRequest request) {
+        Specification<Order> spec = OrderSpecification.filterOrders(request);
+        Pageable pageable = PageRequest.of(request.getPage() - 1, request.getSize(), Sort.by("createdAt").descending());
+        
         Page<Order> orderPage = orderRepository.findAll(spec, pageable);
 
         List<OrderListDto> items = orderPage.getContent().stream()
@@ -101,7 +72,7 @@ public class OrderServiceImpl implements OrderService {
                 .collect(Collectors.toList());
 
         PageData.Pagination pagination = PageData.Pagination.builder()
-                .page(page)
+                .page(request.getPage())
                 .totalPages(orderPage.getTotalPages())
                 .totalItems(orderPage.getTotalElements())
                 .build();

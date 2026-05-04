@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -38,13 +39,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException ex) {
-        List<Map<String, String>> errors = new ArrayList<>();
-        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
-            Map<String, String> error = new HashMap<>();
-            error.put("field", fieldError.getField());
-            error.put("message", fieldError.getDefaultMessage());
-            errors.add(error);
-        }
+        List<Map<String, String>> errors = ex.getBindingResult().getFieldErrors().stream()
+                .map(fieldError -> {
+                    Map<String, String> error = new HashMap<>();
+                    error.put("field", fieldError.getField());
+                    error.put("message", fieldError.getDefaultMessage());
+                    return error;
+                })
+                .collect(Collectors.toList());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("VALIDATION_ERROR", "Dữ liệu không hợp lệ", errors));
     }

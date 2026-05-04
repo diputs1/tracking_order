@@ -4,6 +4,7 @@ import com.example.tracking_order.common.response.ApiResponse;
 import com.example.tracking_order.common.response.PageData;
 import com.example.tracking_order.modules.order.dto.OrderDetailDto;
 import com.example.tracking_order.modules.order.dto.OrderListDto;
+import com.example.tracking_order.modules.order.dto.OrderSearchRequest;
 import com.example.tracking_order.modules.order.dto.OrderStatusUpdateRequest;
 import com.example.tracking_order.modules.order.dto.ReturnRequestDto;
 import com.example.tracking_order.modules.order.enums.OrderStatus;
@@ -25,27 +26,16 @@ public class OrderController {
     private final OrderService orderService;
 
     @GetMapping
-    public ApiResponse<PageData<OrderListDto>> getMyOrders(
-            @RequestParam(required = false) OrderStatus status,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from_date,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to_date,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
+    public ApiResponse<PageData<OrderListDto>> getMyOrders(OrderSearchRequest request) {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return ApiResponse.success(orderService.getOrders(userDetails.getId(), status, from_date, to_date, page, size));
+        request.setUserId(userDetails.getId());
+        return ApiResponse.success(orderService.getOrders(request));
     }
 
     @GetMapping("/admin")
-    public ApiResponse<PageData<OrderListDto>> getAllOrders(
-            @RequestParam(required = false) OrderStatus status,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from_date,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to_date,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
-        // Here admin sees all orders. userId is null.
-        return ApiResponse.success(orderService.getOrders(null, status, from_date, to_date, page, size));
+    public ApiResponse<PageData<OrderListDto>> getAllOrders(OrderSearchRequest request) {
+        // Here admin sees all orders. userId remains null in request.
+        return ApiResponse.success(orderService.getOrders(request));
     }
 
     @GetMapping("/{orderId}")
