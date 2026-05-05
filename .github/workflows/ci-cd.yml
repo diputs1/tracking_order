@@ -1,0 +1,85 @@
+name: tracking_order CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # Bước 1: Build & Test
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    # Phân quyền thực thi cho file mvnw (tránh lỗi permission denied)
+    - name: Grant execute permission for mvnw
+      run: chmod +x mvnw
+
+    - name: Build with Maven (Including Tests)
+      run: ./mvnw clean verify
+
+  # Bước 2: Build Docker Image và Push lên GHCR
+  docker-build-push:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' # Chỉ chạy khi trên nhánh main
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: Log in to GitHub Container Registry (GHCR)
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }} # Secret này do GitHub tự động tạo
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and Push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ghcr.io/${{ github.repository_owner }}/tracking_order:latest
+
+  # Bước 3: Deploy lên VPS (Chạy SSH)
+  deploy:
+    needs: docker-build-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Deploy to VPS via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          # 1. Đăng nhập Docker vào GHCR
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
+          # 2. Chuyển hướng tới thư mục chứa project (bạn có thể đổi đường dẫn này trên server của bạn)
+          cd /opt/tracking_order
+          
+          # 3. Kéo image mới nhất từ GHCR
+          docker-compose pull backend
+          
+          # 4. Tái khởi động lại service backend
+          docker-compose up -d --no-deps backend
+          
+          # 5. Dọn dẹp docker images cũ rác (dangling)
+          docker image prune -f

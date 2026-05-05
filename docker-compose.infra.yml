@@ -11,5 +11,55 @@ services:
       - redis_data:/data
     restart: unless-stopped
 
+  mysql-primary:
+    image: bitnami/mysql:8.0
+    container_name: mysql-primary
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=tracking_order
+      - MYSQL_REPLICATION_MODE=master
+      - MYSQL_REPLICATION_USER=repl_user
+      - MYSQL_REPLICATION_PASSWORD=repl_password
+    volumes:
+      - mysql_primary_data:/bitnami/mysql
+    restart: always
+
+  mysql-replica:
+    image: bitnami/mysql:8.0
+    container_name: mysql-replica
+    ports:
+      - "3308:3306"
+    depends_on:
+      - mysql-primary
+    environment:
+      - MYSQL_REPLICATION_MODE=slave
+      - MYSQL_MASTER_HOST=mysql-primary
+      - MYSQL_MASTER_PORT_NUMBER=3306
+      - MYSQL_MASTER_ROOT_PASSWORD=password
+      - MYSQL_REPLICATION_USER=repl_user
+      - MYSQL_REPLICATION_PASSWORD=repl_password
+    volumes:
+      - mysql_replica_data:/bitnami/mysql
+    restart: always
+
+  mysql-backup:
+    image: fradelg/mysql-cron-backup
+    container_name: mysql-backup
+    depends_on:
+      - mysql-replica
+    environment:
+      - MYSQL_HOST=mysql-replica
+      - MYSQL_USER=root
+      - MYSQL_PASS=password
+      - CRON_TIME=0 2 * * *
+      - MAX_BACKUPS=7
+    volumes:
+      - ./backup:/backup
+    restart: always
+
 volumes:
   redis_data:
+  mysql_primary_data:
+  mysql_replica_data:
