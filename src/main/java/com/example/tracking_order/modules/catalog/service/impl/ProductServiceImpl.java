@@ -24,6 +24,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
@@ -44,6 +46,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "products_list", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName() + '_' + #page + '_' + #size + '_' + #categoryId")
     public PageData<ProductListDto> getProducts(String search, String sku, Long categoryId, ProductStatus status,
                                                  BigDecimal minPrice, BigDecimal maxPrice, Long sellerId,
                                                  String sort, int page, int size) {
@@ -172,6 +175,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "product_details", key = "#productId")
     public ProductDetailDto getProductDetail(Long productId) {
         Product product = productRepository.findByIdWithDetails(productId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không tồn tại"));
@@ -180,6 +184,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "product_details", key = "#productId")
     public ProductDetailDto updateProduct(Long productId, UpdateProductRequest request) {
         User user = getCurrentUser();
         Product product = getProductWithOwnerCheck(productId, user);
@@ -205,6 +210,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "product_details", key = "#productId")
     public InventoryDto updateInventory(Long productId, UpdateInventoryRequest request) {
         User user = getCurrentUser();
         Inventory inventory = inventoryRepository.findByProductId(productId)

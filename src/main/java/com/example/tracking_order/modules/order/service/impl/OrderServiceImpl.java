@@ -24,6 +24,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -63,6 +65,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     @LogExecutionTime
+    @Cacheable(value = "orders_list", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName() + '_' + #request.hashCode()")
     public PageData<OrderListDto> getOrders(OrderSearchRequest request) {
         Specification<Order> spec = OrderSpecification.filterOrders(request);
         Pageable pageable = PageRequest.of(request.getPage() - 1, request.getSize(), Sort.by("createdAt").descending());
@@ -84,6 +87,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "order_details", key = "#orderId")
     public OrderDetailDto getOrderDetail(Long orderId) {
         User user = getCurrentUser();
         Order order = getOrderWithOwnerCheck(orderId, user);
@@ -93,6 +97,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     @LogExecutionTime
+    @CacheEvict(value = "order_details", key = "#orderId")
     public OrderDetailDto updateOrderStatus(Long orderId, OrderStatusUpdateRequest request) {
         User user = getCurrentUser();
         Order order = getOrderWithOwnerCheck(orderId, user);
@@ -124,6 +129,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "order_details", key = "#orderId")
     public OrderDetailDto requestReturn(Long orderId, ReturnRequestDto request) {
         User user = getCurrentUser();
         Order order = getOrderWithOwnerCheck(orderId, user);
