@@ -12,6 +12,7 @@ import com.example.tracking_order.security.UserDetailsImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -29,6 +30,7 @@ public class OrderController {
     }
 
     @GetMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<PageData<OrderListDto>> getAllOrders(OrderSearchRequest request) {
         // Here admin sees all orders. userId remains null in request.
         return ApiResponse.success(orderService.getOrders(request));

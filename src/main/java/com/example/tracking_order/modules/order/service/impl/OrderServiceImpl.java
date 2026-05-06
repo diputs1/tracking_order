@@ -65,7 +65,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     @LogExecutionTime
-    @Cacheable(value = "orders_list", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName() + '_' + #request.hashCode()")
+    @Cacheable(value = "orders_list", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName() + '_' + #request.page + '_' + #request.size + '_' + (#request.status ?: 'all') + '_' + (#request.orderCode ?: '')")
     public PageData<OrderListDto> getOrders(OrderSearchRequest request) {
         Specification<Order> spec = OrderSpecification.filterOrders(request);
         Pageable pageable = PageRequest.of(request.getPage() - 1, request.getSize(), Sort.by("createdAt").descending());
@@ -124,7 +124,7 @@ public class OrderServiceImpl implements OrderService {
             order.getId()
         );
 
-        return getOrderDetail(orderId);
+        return orderMapper.toOrderDetailDto(order);
     }
 
     @Override
@@ -152,6 +152,6 @@ public class OrderServiceImpl implements OrderService {
             order.getId()
         );
 
-        return getOrderDetail(orderId);
+        return orderMapper.toOrderDetailDto(order);
     }
 }

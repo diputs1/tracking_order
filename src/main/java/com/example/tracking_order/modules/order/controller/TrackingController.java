@@ -6,6 +6,7 @@ import com.example.tracking_order.modules.order.dto.TrackingLogDto;
 import com.example.tracking_order.modules.order.service.TrackingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +24,7 @@ public class TrackingController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'SHIPPER')")
     public ApiResponse<TrackingLogDto> addTrackingLog(
             @PathVariable Long orderId,
             @Valid @RequestBody CreateTrackingLogRequest request) {

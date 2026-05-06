@@ -46,7 +46,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = "products_list", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName() + '_' + #page + '_' + #size + '_' + #categoryId")
+    @Cacheable(value = "products_list", key = "(#search ?: '') + '_' + (#sku ?: '') + '_' + (#categoryId ?: 'all') + '_' + (#status ?: 'all') + '_' + (#minPrice ?: '') + '_' + (#maxPrice ?: '') + '_' + (#sellerId ?: 'all') + '_' + (#sort ?: 'default') + '_' + #page + '_' + #size")
     public PageData<ProductListDto> getProducts(String search, String sku, Long categoryId, ProductStatus status,
                                                  BigDecimal minPrice, BigDecimal maxPrice, Long sellerId,
                                                  String sort, int page, int size) {
@@ -141,7 +141,7 @@ public class ProductServiceImpl implements ProductService {
                 .build();
         inventoryRepository.save(inventory);
 
-        return getProductDetail(product.getId());
+        return mapToDetailDto(product);
     }
 
     private User getCurrentUser() {
@@ -190,7 +190,7 @@ public class ProductServiceImpl implements ProductService {
         if (request.getWeight() != null) product.setWeight(request.getWeight());
 
         productRepository.save(product);
-        return getProductDetail(productId);
+        return mapToDetailDto(product);
     }
 
     @Override

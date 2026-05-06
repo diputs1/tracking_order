@@ -79,6 +79,10 @@ public class CartServiceImpl implements CartService {
     @Override
     @Transactional(readOnly = true)
     public CartDto getCart() {
+        return getCartInternal();
+    }
+
+    private CartDto getCartInternal() {
         User user = getCurrentUser();
         Optional<Cart> cartOpt = cartRepository.findByUserId(user.getId());
         
@@ -201,7 +205,7 @@ public class CartServiceImpl implements CartService {
             cartItemRepository.save(newItem);
         }
         
-        return getCart();
+        return getCartInternal();
     }
 
     @Override
@@ -217,7 +221,7 @@ public class CartServiceImpl implements CartService {
 
         if (request.getQuantity() == 0) {
             cartItemRepository.delete(item);
-            return getCart();
+            return getCartInternal();
         }
         
         Inventory inventory = inventoryRepository.findByProductIdWithLock(item.getProduct().getId())
@@ -231,7 +235,7 @@ public class CartServiceImpl implements CartService {
         item.setQuantity(request.getQuantity());
         cartItemRepository.save(item);
         
-        return getCart();
+        return getCartInternal();
     }
 
     @Override
@@ -241,7 +245,7 @@ public class CartServiceImpl implements CartService {
         CartItem item = cartItemRepository.findByIdAndCartUserId(itemId, user.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thực hiện hành động này hoặc sản phẩm không có trong giỏ"));
         cartItemRepository.delete(item);
-        return getCart();
+        return getCartInternal();
     }
 
     @Override
@@ -371,7 +375,7 @@ public class CartServiceImpl implements CartService {
             return new DiscountResult(BigDecimal.ZERO, null);
         }
 
-        Discount appliedDiscount = discountRepository.findByCodeAndIsActiveTrue(code)
+        Discount appliedDiscount = discountRepository.findByCodeAndIsActiveTrueWithLock(code)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Mã giảm giá không hợp lệ"));
 
         LocalDateTime now = LocalDateTime.now();

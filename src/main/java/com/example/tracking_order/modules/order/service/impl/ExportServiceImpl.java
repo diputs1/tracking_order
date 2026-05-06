@@ -6,7 +6,10 @@ import com.example.tracking_order.modules.order.repository.OrderRepository;
 import com.example.tracking_order.modules.order.service.ExportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
@@ -22,6 +25,7 @@ public class ExportServiceImpl implements ExportService {
     private final OrderRepository orderRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public byte[] exportOrdersToCsv(OrderStatus status, LocalDateTime fromDate, LocalDateTime toDate) {
         Specification<Order> spec = (root, query, cb) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
@@ -37,7 +41,9 @@ public class ExportServiceImpl implements ExportService {
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
 
-        List<Order> orders = orderRepository.findAll(spec);
+        // Giới hạn 1000 record để tránh OOM, trong thực tế nên dùng Pageable từ Controller
+        Pageable limit = PageRequest.of(0, 1000);
+        List<Order> orders = orderRepository.findAll(spec, limit).getContent();
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.write(0xEF);

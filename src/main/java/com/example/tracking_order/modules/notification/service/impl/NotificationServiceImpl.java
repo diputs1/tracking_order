@@ -32,8 +32,9 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Async
+    @Transactional
     public void sendNotification(User user, String title, String message, NotificationType type, String relatedEntityType, Long relatedEntityId) {
-        log.info("Sending async notification to user {}: {}", user.getEmail(), title);
+        log.info("Sending async notification to userId {}: {}", user.getId(), title);
         
         NotificationLog notification = NotificationLog.builder()
                 .user(user)

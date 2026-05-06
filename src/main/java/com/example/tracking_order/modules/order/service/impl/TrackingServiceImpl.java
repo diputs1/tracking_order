@@ -84,6 +84,7 @@ public class TrackingServiceImpl implements TrackingService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<TrackingLogDto> getTrackingLogs(Long orderId) {
         checkOrderPermission(orderId);
         
