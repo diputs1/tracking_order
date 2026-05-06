@@ -6,9 +6,7 @@ import com.example.tracking_order.modules.order.dto.OrderListDto;
 import com.example.tracking_order.modules.order.dto.OrderSearchRequest;
 import com.example.tracking_order.modules.order.dto.OrderStatusUpdateRequest;
 import com.example.tracking_order.modules.order.dto.ReturnRequestDto;
-import com.example.tracking_order.modules.order.enums.OrderStatus;
 
-import java.time.LocalDateTime;
 
 public interface OrderService {
     PageData<OrderListDto> getOrders(OrderSearchRequest request);

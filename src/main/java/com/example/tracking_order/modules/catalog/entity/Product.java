@@ -61,6 +61,9 @@ public class Product {
     @Builder.Default
     private ProductStatus status = ProductStatus.ACTIVE;
 
+    @Column(name = "image_url")
+    private String imageUrl;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 

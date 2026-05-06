@@ -124,6 +124,7 @@ public class ProductServiceImpl implements ProductService {
                 .slug(slug)
                 .basePrice(request.getBasePrice())
                 .salePrice(request.getSalePrice())
+                .imageUrl(request.getImageUrl())
                 .description(request.getDescription())
                 .weight(request.getWeight() != null ? request.getWeight() : BigDecimal.ZERO)
                 .status(request.getStatus() != null ? request.getStatus() : ProductStatus.ACTIVE)
@@ -149,15 +150,6 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED, "Người dùng không hợp lệ"));
     }
 
-    private void checkProductOwnership(Product product, User user) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        boolean isAdmin = userDetails.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        
-        if (!isAdmin && !product.getSeller().getId().equals(user.getId())) {
-            throw new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thao tác trên sản phẩm này");
-        }
-    }
 
     private Product getProductWithOwnerCheck(Long productId, User user) {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -192,6 +184,7 @@ public class ProductServiceImpl implements ProductService {
         if (request.getName() != null) product.setName(request.getName());
         if (request.getBasePrice() != null) product.setBasePrice(request.getBasePrice());
         if (request.getSalePrice() != null) product.setSalePrice(request.getSalePrice());
+        if (request.getImageUrl() != null) product.setImageUrl(request.getImageUrl());
         if (request.getDescription() != null) product.setDescription(request.getDescription());
         if (request.getStatus() != null) product.setStatus(request.getStatus());
         if (request.getWeight() != null) product.setWeight(request.getWeight());

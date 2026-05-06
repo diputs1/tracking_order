@@ -11,6 +11,10 @@ import java.util.List;
 @Builder
 public class CartDto {
     private Long cartId;
+    @JsonProperty("user_id")
+    private Long userId;
+    @JsonProperty("created_at")
+    private java.time.LocalDateTime createdAt;
     private List<CartItemDto> items;
     private Summary summary;
 

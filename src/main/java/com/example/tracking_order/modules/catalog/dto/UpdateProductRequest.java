@@ -16,6 +16,8 @@ public class UpdateProductRequest {
     private BigDecimal salePrice;
     private String description;
     private ProductStatus status;
+    @JsonProperty("image_url")
+    private String imageUrl;
     private List<String> images;
     private BigDecimal weight;
 }

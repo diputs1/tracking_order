@@ -7,18 +7,19 @@ import com.example.tracking_order.modules.shipping.dto.ShippingCarrierRequest;
 import com.example.tracking_order.modules.shipping.entity.ShippingCarrier;
 import com.example.tracking_order.modules.shipping.repository.ShippingCarrierRepository;
 import com.example.tracking_order.modules.shipping.service.ShippingCarrierService;
+import com.example.tracking_order.modules.shipping.mapper.ShippingMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ShippingCarrierServiceImpl implements ShippingCarrierService {
 
     private final ShippingCarrierRepository carrierRepository;
+    private final ShippingMapper shippingMapper;
 
     @Override
     @Transactional(readOnly = true)
@@ -27,13 +28,7 @@ public class ShippingCarrierServiceImpl implements ShippingCarrierService {
             ? carrierRepository.findByIsActiveTrue() 
             : carrierRepository.findAll();
             
-        return carriers.stream().map(c -> ShippingCarrierDto.builder()
-                .id(c.getId())
-                .name(c.getName())
-                .code(c.getCode())
-                .trackingUrlTemplate(c.getTrackingUrlTemplate())
-                .isActive(c.getIsActive())
-                .build()).collect(Collectors.toList());
+        return shippingMapper.toShippingCarrierDtoList(carriers);
     }
 
     @Override
@@ -46,7 +41,7 @@ public class ShippingCarrierServiceImpl implements ShippingCarrierService {
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
                 .build();
         carrier = carrierRepository.save(carrier);
-        return mapToDto(carrier);
+        return shippingMapper.toShippingCarrierDto(carrier);
     }
 
     @Override
@@ -61,16 +56,7 @@ public class ShippingCarrierServiceImpl implements ShippingCarrierService {
         if (request.getIsActive() != null) carrier.setIsActive(request.getIsActive());
 
         carrierRepository.save(carrier);
-        return mapToDto(carrier);
+        return shippingMapper.toShippingCarrierDto(carrier);
     }
 
-    private ShippingCarrierDto mapToDto(ShippingCarrier carrier) {
-        return ShippingCarrierDto.builder()
-                .id(carrier.getId())
-                .name(carrier.getName())
-                .code(carrier.getCode())
-                .trackingUrlTemplate(carrier.getTrackingUrlTemplate())
-                .isActive(carrier.getIsActive())
-                .build();
-    }
 }

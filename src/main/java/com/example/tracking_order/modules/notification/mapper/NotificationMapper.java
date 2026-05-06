@@ -6,12 +6,13 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
+import java.util.List;
+
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface NotificationMapper {
 
-    @Mapping(target = "relatedEntityType", source = "relatedEntityType")
-    @Mapping(target = "relatedEntityId", source = "relatedEntityId")
-    @Mapping(target = "isRead", source = "isRead")
-    @Mapping(target = "createdAt", source = "createdAt")
+    @Mapping(target = "type", expression = "java(notificationLog.getType().name())")
     NotificationDto toNotificationDto(NotificationLog notificationLog);
+
+    List<NotificationDto> toNotificationDtoList(List<NotificationLog> notificationLogs);
 }

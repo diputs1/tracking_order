@@ -115,22 +115,19 @@ public class CartServiceImpl implements CartService {
         for (CartItem item : items) {
             Product product = item.getProduct();
             Inventory inventory = productIdInventoryMap.get(product.getId());
-            int inStock = inventory != null ? inventory.getQuantityInStock() - inventory.getQuantityReserved() : 0;
-            boolean isAvailable = inStock >= item.getQuantity() && product.getStatus() == ProductStatus.ACTIVE;
             
-            if (!isAvailable) {
+            CartDto.CartItemDto itemDto = buildCartItemDto(item, inventory);
+            
+            if (!itemDto.getIsAvailable()) {
                 hasOutOfStock = true;
             }
             
-            BigDecimal currentPrice = product.getSalePrice() != null ? product.getSalePrice() : product.getBasePrice();
-            BigDecimal itemSubtotal = currentPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
-            
             totalQty += item.getQuantity();
-            if (isAvailable) {
-                subtotal = subtotal.add(itemSubtotal);
+            if (itemDto.getIsAvailable()) {
+                subtotal = subtotal.add(itemDto.getSubtotal());
             }
             
-            itemDtos.add(cartMapper.toCartItemDto(item, currentPrice, inStock, isAvailable, itemSubtotal));
+            itemDtos.add(itemDto);
         }
 
         CartDto.Summary summary = CartDto.Summary.builder()
@@ -144,6 +141,18 @@ public class CartServiceImpl implements CartService {
         cartDto.setItems(itemDtos);
         cartDto.setSummary(summary);
         return cartDto;
+    }
+
+    private CartDto.CartItemDto buildCartItemDto(CartItem item, Inventory inventory) {
+        Product product = item.getProduct();
+        
+        int inStock = inventory != null ? inventory.getQuantityInStock() - inventory.getQuantityReserved() : 0;
+        boolean isAvailable = inStock >= item.getQuantity() && product.getStatus() == ProductStatus.ACTIVE;
+        
+        BigDecimal currentPrice = product.getSalePrice() != null ? product.getSalePrice() : product.getBasePrice();
+        BigDecimal itemSubtotal = currentPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+        
+        return cartMapper.toCartItemDto(item, currentPrice, inStock, isAvailable, itemSubtotal);
     }
 
     @Override
@@ -429,6 +438,7 @@ public class CartServiceImpl implements CartService {
                     .product(product)
                     .productName(product.getName())
                     .productSku(product.getSku())
+                    .productImage(product.getImageUrl())
                     .unitPrice(currentPrice)
                     .quantity(item.getQuantity())
                     .subtotal(currentPrice.multiply(BigDecimal.valueOf(item.getQuantity())))

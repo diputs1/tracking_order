@@ -37,6 +37,8 @@ public class CreateProductRequest {
     @JsonProperty("initial_stock")
     private Integer initialStock;
 
+    @JsonProperty("image_url")
+    private String imageUrl;
     private List<String> images;
     private ProductStatus status;
 }

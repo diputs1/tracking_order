@@ -13,13 +13,16 @@ import java.math.BigDecimal;
 public interface CartMapper {
 
     @Mapping(target = "cartId", source = "id")
-    @Mapping(target = "items", ignore = true) // Handled manually in service or by another method
+    @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "createdAt", source = "createdAt")
+    @Mapping(target = "items", ignore = true)
     @Mapping(target = "summary", ignore = true)
     CartDto toCartDto(Cart cart);
 
     @Mapping(target = "itemId", source = "item.id")
     @Mapping(target = "productId", source = "item.product.id")
     @Mapping(target = "productName", source = "item.product.name")
+    @Mapping(target = "productImage", source = "item.product.imageUrl")
     @Mapping(target = "productSku", source = "item.product.sku")
     @Mapping(target = "priceSnapshot", source = "item.priceSnapshot")
     @Mapping(target = "quantity", source = "item.quantity")
