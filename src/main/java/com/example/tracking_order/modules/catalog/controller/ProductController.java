@@ -7,6 +7,7 @@ import com.example.tracking_order.modules.catalog.enums.ProductStatus;
 import com.example.tracking_order.modules.catalog.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -36,6 +37,7 @@ public class ProductController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'SELLER')")
     public ApiResponse<ProductDetailDto> createProduct(@Valid @RequestBody CreateProductRequest request) {
         return ApiResponse.success(productService.createProduct(request));
     }
@@ -46,6 +48,7 @@ public class ProductController {
     }
 
     @PatchMapping("/{productId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SELLER')")
     public ApiResponse<ProductDetailDto> updateProduct(
             @PathVariable Long productId,
             @Valid @RequestBody UpdateProductRequest request) {
@@ -58,6 +61,7 @@ public class ProductController {
     }
 
     @PatchMapping("/{productId}/inventory")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<InventoryDto> updateInventory(
             @PathVariable Long productId,
             @Valid @RequestBody UpdateInventoryRequest request) {
