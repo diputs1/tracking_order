@@ -23,7 +23,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 
@@ -44,16 +47,20 @@ public class ProductServiceImpl implements ProductService {
     private final InventoryRepository inventoryRepository;
     private final UserRepository userRepository;
 
+    @Autowired
+    @Lazy
+    private ProductService self;
+
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
     @Cacheable(value = "products_list", key = "(#search ?: '') + '_' + (#sku ?: '') + '_' + (#categoryId ?: 'all') + '_' + (#status ?: 'all') + '_' + (#minPrice ?: '') + '_' + (#maxPrice ?: '') + '_' + (#sellerId ?: 'all') + '_' + (#sort ?: 'default') + '_' + #page + '_' + #size")
     public PageData<ProductListDto> getProducts(String search, String sku, Long categoryId, ProductStatus status,
-                                                 BigDecimal minPrice, BigDecimal maxPrice, Long sellerId,
-                                                 String sort, int page, int size) {
-        
+            BigDecimal minPrice, BigDecimal maxPrice, Long sellerId,
+            String sort, int page, int size) {
+
         Specification<Product> spec = (root, query, cb) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
-            
+
             if (search != null && !search.isEmpty()) {
                 predicates.add(cb.like(cb.lower(root.get("name")), "%" + search.toLowerCase() + "%"));
             }
@@ -79,12 +86,16 @@ public class ProductServiceImpl implements ProductService {
         };
 
         Sort sortOrder = Sort.unsorted();
-        if ("price_asc".equals(sort)) sortOrder = Sort.by("basePrice").ascending();
-        else if ("price_desc".equals(sort)) sortOrder = Sort.by("basePrice").descending();
-        else if ("newest".equals(sort)) sortOrder = Sort.by("createdAt").descending();
+        if ("price_asc".equals(sort))
+            sortOrder = Sort.by("basePrice").ascending();
+        else if ("price_desc".equals(sort))
+            sortOrder = Sort.by("basePrice").descending();
+        else if ("newest".equals(sort))
+            sortOrder = Sort.by("createdAt").descending();
 
         Pageable pageable = PageRequest.of(page - 1, size, sortOrder);
-        Page<com.example.tracking_order.modules.catalog.dto.ProductProjection> productPage = productRepository.findAllProjected(spec, pageable);
+        Page<com.example.tracking_order.modules.catalog.dto.ProductProjection> productPage = productRepository
+                .findAllProjected(spec, pageable);
 
         List<ProductListDto> items = productPage.getContent().stream()
                 .map(this::mapProjectionToDto)
@@ -103,7 +114,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ProductDetailDto createProduct(CreateProductRequest request) {
         if (productRepository.existsBySku(request.getSku())) {
             throw new AppException(ErrorCode.DUPLICATE_SKU, "Mã SKU đã tồn tại");
@@ -112,7 +123,8 @@ public class ProductServiceImpl implements ProductService {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Danh mục không tồn tại"));
 
-        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication()
+                .getPrincipal();
         User seller = userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED, "Người bán không hợp lệ"));
 
@@ -131,7 +143,7 @@ public class ProductServiceImpl implements ProductService {
                 .category(category)
                 .seller(seller)
                 .build();
-        
+
         product = productRepository.save(product);
 
         Inventory inventory = Inventory.builder()
@@ -141,32 +153,34 @@ public class ProductServiceImpl implements ProductService {
                 .build();
         inventoryRepository.save(inventory);
 
-        return mapToDetailDto(product);
+        return self.getProductDetail(product.getId());
     }
 
     private User getCurrentUser() {
-        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication()
+                .getPrincipal();
         return userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED, "Người dùng không hợp lệ"));
     }
 
-
     private Product getProductWithOwnerCheck(Long productId, User user) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication()
+                .getPrincipal();
         boolean isAdmin = userDetails.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        
+
         if (isAdmin) {
             return productRepository.findById(productId)
                     .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không tồn tại"));
         } else {
             return productRepository.findByIdAndSellerId(productId, user.getId())
-                    .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thao tác trên sản phẩm này hoặc sản phẩm không tồn tại"));
+                    .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN,
+                            "Bạn không có quyền thao tác trên sản phẩm này hoặc sản phẩm không tồn tại"));
         }
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
     @Cacheable(value = "product_details", key = "#productId")
     public ProductDetailDto getProductDetail(Long productId) {
         Product product = productRepository.findByIdWithDetails(productId)
@@ -175,26 +189,33 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     @CacheEvict(value = "product_details", key = "#productId")
     public ProductDetailDto updateProduct(Long productId, UpdateProductRequest request) {
         User user = getCurrentUser();
         Product product = getProductWithOwnerCheck(productId, user);
 
-        if (request.getName() != null) product.setName(request.getName());
-        if (request.getBasePrice() != null) product.setBasePrice(request.getBasePrice());
-        if (request.getSalePrice() != null) product.setSalePrice(request.getSalePrice());
-        if (request.getImageUrl() != null) product.setImageUrl(request.getImageUrl());
-        if (request.getDescription() != null) product.setDescription(request.getDescription());
-        if (request.getStatus() != null) product.setStatus(request.getStatus());
-        if (request.getWeight() != null) product.setWeight(request.getWeight());
+        if (request.getName() != null)
+            product.setName(request.getName());
+        if (request.getBasePrice() != null)
+            product.setBasePrice(request.getBasePrice());
+        if (request.getSalePrice() != null)
+            product.setSalePrice(request.getSalePrice());
+        if (request.getImageUrl() != null)
+            product.setImageUrl(request.getImageUrl());
+        if (request.getDescription() != null)
+            product.setDescription(request.getDescription());
+        if (request.getStatus() != null)
+            product.setStatus(request.getStatus());
+        if (request.getWeight() != null)
+            product.setWeight(request.getWeight());
 
         productRepository.save(product);
-        return mapToDetailDto(product);
+        return self.getProductDetail(productId);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
     public InventoryDto getInventory(Long productId) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không có kho"));
@@ -202,7 +223,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     @CacheEvict(value = "product_details", key = "#productId")
     public InventoryDto updateInventory(Long productId, UpdateInventoryRequest request) {
         User user = getCurrentUser();
@@ -214,10 +235,11 @@ public class ProductServiceImpl implements ProductService {
         inventory.setQuantityInStock(request.getQuantityInStock());
         inventoryRepository.save(inventory);
 
-        return mapToInventoryDto(inventory);
+        return self.getInventory(productId);
     }
 
-    private ProductListDto mapProjectionToDto(com.example.tracking_order.modules.catalog.dto.ProductProjection projection) {
+    private ProductListDto mapProjectionToDto(
+            com.example.tracking_order.modules.catalog.dto.ProductProjection projection) {
         int inStock = projection.getQuantityInStock() != null ? projection.getQuantityInStock() : 0;
         int reserved = projection.getQuantityReserved() != null ? projection.getQuantityReserved() : 0;
 
@@ -244,7 +266,6 @@ public class ProductServiceImpl implements ProductService {
                 .ratingAvg(BigDecimal.ZERO)
                 .build();
     }
-
 
     private ProductDetailDto mapToDetailDto(Product product) {
         Inventory inventory = product.getInventory();
@@ -298,7 +319,8 @@ public class ProductServiceImpl implements ProductService {
     private static final Pattern WHITE_SPACE = Pattern.compile("[\\s]");
 
     public static String toSlug(String input) {
-        if (input == null) return "";
+        if (input == null)
+            return "";
         String nowhitespace = WHITE_SPACE.matcher(input).replaceAll("-");
         String normalized = Normalizer.normalize(nowhitespace, Normalizer.Form.NFD);
         String slug = NONLATIN.matcher(normalized).replaceAll("");

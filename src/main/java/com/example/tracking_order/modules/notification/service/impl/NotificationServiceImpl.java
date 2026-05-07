@@ -18,6 +18,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -32,7 +33,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Async
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void sendNotification(User user, String title, String message, NotificationType type, String relatedEntityType, Long relatedEntityId) {
         log.info("Sending async notification to userId {}: {}", user.getId(), title);
         
@@ -49,7 +50,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
     public PageData<NotificationDto> getMyNotifications(int page, int size) {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Page<NotificationLog> notifPage = notificationLogRepository.findByUserIdOrderByCreatedAtDesc(
@@ -67,7 +68,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void markAsRead(Long id) {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         
