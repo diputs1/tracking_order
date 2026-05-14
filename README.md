@@ -10,7 +10,7 @@ Hệ thống quản lý và theo dõi đơn hàng (Order Tracking) được xây
 
 ---
 
-## 🚀 Tech Stack
+## Tech Stack
 
 ### Backend
 - **Core:** Java 17, Spring Boot 3.5.13
@@ -28,7 +28,7 @@ Hệ thống quản lý và theo dõi đơn hàng (Order Tracking) được xây
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 - [x] **Authentication:** Đăng ký, đăng nhập với JWT, phân quyền chi tiết.
 - [x] **Product Catalog:** Quản lý sản phẩm, danh mục và kho hàng.
@@ -39,7 +39,7 @@ Hệ thống quản lý và theo dõi đơn hàng (Order Tracking) được xây
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 Dự án hiện tại là một **Modular Monolith**, được thiết kế để dễ dàng tách rời thành Microservices trong tương lai:
 
@@ -77,7 +77,7 @@ Sau đó chạy ứng dụng Spring Boot:
 
 ---
 
-## 📖 API Documentation
+## API Documentation
 
 Sau khi ứng dụng khởi chạy thành công, bạn có thể truy cập tài liệu API tại:
 - **Swagger UI:** `http://localhost:8080/swagger-ui/index.html`
@@ -85,14 +85,3 @@ Sau khi ứng dụng khởi chạy thành công, bạn có thể truy cập tài
 
 ---
 
-## 🚢 Roadmap
-
-- [ ] Tích hợp **Kafka** để decoupling các service (Order -> Shipping).
-- [ ] Triển khai **Redis Cluster** cho High Availability.
-- [ ] Chuyển đổi sang kiến trúc **Microservices**.
-- [ ] Tích hợp các cổng thanh toán (VNPay, Momo).
-
----
-
-## 📄 License
-Project này được phát triển bởi **Antigravity**. Vui lòng liên hệ nếu bạn muốn đóng góp!

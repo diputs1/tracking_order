@@ -26,6 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
@@ -43,6 +45,13 @@ public class ProductServiceImpl implements ProductService {
     private final CategoryRepository categoryRepository;
     private final InventoryRepository inventoryRepository;
     private final UserRepository userRepository;
+    
+    private ProductServiceImpl self;
+
+    @Autowired
+    public void setSelf(@Lazy ProductServiceImpl self) {
+        this.self = self;
+    }
 
     @Override
     @Transactional(readOnly = true)

@@ -38,6 +38,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -64,6 +66,13 @@ public class CartServiceImpl implements CartService {
     private final PaymentRepository paymentRepository;
     private final CartMapper cartMapper;
     private final OrderMapper orderMapper;
+    
+    private CartServiceImpl self;
+
+    @Autowired
+    public void setSelf(@Lazy CartServiceImpl self) {
+        this.self = self;
+    }
 
     private User getCurrentUser() {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -205,7 +214,7 @@ public class CartServiceImpl implements CartService {
             cartItemRepository.save(newItem);
         }
         
-        return getCartInternal();
+        return self.getCart();
     }
 
     @Override
@@ -221,7 +230,7 @@ public class CartServiceImpl implements CartService {
 
         if (request.getQuantity() == 0) {
             cartItemRepository.delete(item);
-            return getCartInternal();
+            return self.getCart();
         }
         
         Inventory inventory = inventoryRepository.findByProductIdWithLock(item.getProduct().getId())
@@ -235,7 +244,7 @@ public class CartServiceImpl implements CartService {
         item.setQuantity(request.getQuantity());
         cartItemRepository.save(item);
         
-        return getCartInternal();
+        return self.getCart();
     }
 
     @Override
@@ -245,7 +254,7 @@ public class CartServiceImpl implements CartService {
         CartItem item = cartItemRepository.findByIdAndCartUserId(itemId, user.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thực hiện hành động này hoặc sản phẩm không có trong giỏ"));
         cartItemRepository.delete(item);
-        return getCartInternal();
+        return self.getCart();
     }
 
     @Override
