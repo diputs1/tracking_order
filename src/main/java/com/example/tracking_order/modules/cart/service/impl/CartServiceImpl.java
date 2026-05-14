@@ -37,6 +37,7 @@ import com.example.tracking_order.security.UserDetailsImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -67,15 +68,13 @@ public class CartServiceImpl implements CartService {
     private final CartMapper cartMapper;
     private final OrderMapper orderMapper;
     
-    private CartServiceImpl self;
-
     @Autowired
-    public void setSelf(@Lazy CartServiceImpl self) {
-        this.self = self;
-    }
+    @Lazy
+    private CartService self;
 
     private User getCurrentUser() {
-        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication()
+                .getPrincipal();
         return userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED, "Người dùng không tồn tại"));
     }
@@ -86,7 +85,7 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
     public CartDto getCart() {
         return getCartInternal();
     }
@@ -94,7 +93,7 @@ public class CartServiceImpl implements CartService {
     private CartDto getCartInternal() {
         User user = getCurrentUser();
         Optional<Cart> cartOpt = cartRepository.findByUserId(user.getId());
-        
+
         if (cartOpt.isEmpty()) {
             return CartDto.builder()
                     .items(new ArrayList<>())
@@ -106,19 +105,19 @@ public class CartServiceImpl implements CartService {
                             .build())
                     .build();
         }
-        
+
         Cart cart = cartOpt.get();
         List<CartItem> items = cartItemRepository.findByCartId(cart.getId());
         List<CartDto.CartItemDto> itemDtos = new ArrayList<>();
-        
+
         int totalQty = 0;
         BigDecimal subtotal = BigDecimal.ZERO;
         boolean hasOutOfStock = false;
-        
+
         List<Long> idProduct = items.stream()
                 .map(item -> item.getProduct().getId())
                 .toList();
-                
+
         List<Inventory> listInventory = inventoryRepository.findByProductIdIn(idProduct);
         HashMap<Long, Inventory> productIdInventoryMap = new HashMap<>();
         for (Inventory inventory : listInventory) {
@@ -128,18 +127,18 @@ public class CartServiceImpl implements CartService {
         for (CartItem item : items) {
             Product product = item.getProduct();
             Inventory inventory = productIdInventoryMap.get(product.getId());
-            
+
             CartDto.CartItemDto itemDto = buildCartItemDto(item, inventory);
-            
+
             if (!itemDto.getIsAvailable()) {
                 hasOutOfStock = true;
             }
-            
+
             totalQty += item.getQuantity();
             if (itemDto.getIsAvailable()) {
                 subtotal = subtotal.add(itemDto.getSubtotal());
             }
-            
+
             itemDtos.add(itemDto);
         }
 
@@ -158,40 +157,40 @@ public class CartServiceImpl implements CartService {
 
     private CartDto.CartItemDto buildCartItemDto(CartItem item, Inventory inventory) {
         Product product = item.getProduct();
-        
+
         int inStock = inventory != null ? inventory.getQuantityInStock() - inventory.getQuantityReserved() : 0;
         boolean isAvailable = inStock >= item.getQuantity() && product.getStatus() == ProductStatus.ACTIVE;
-        
+
         BigDecimal currentPrice = product.getSalePrice() != null ? product.getSalePrice() : product.getBasePrice();
         BigDecimal itemSubtotal = currentPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
-        
+
         return cartMapper.toCartItemDto(item, currentPrice, inStock, isAvailable, itemSubtotal);
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public CartDto addToCart(AddToCartRequest request) {
         User user = getCurrentUser();
         Cart cart = getOrCreateCart(user);
-        
+
         if (request.getQuantity() <= 0) {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Số lượng sản phẩm phải lớn hơn 0");
         }
 
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không tồn tại"));
-                
+
         if (product.getStatus() != ProductStatus.ACTIVE) {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Sản phẩm ngừng kinh doanh");
         }
-        
+
         Inventory inventory = inventoryRepository.findByProductIdWithLock(product.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Không có thông tin tồn kho"));
-                
+
         int available = inventory.getQuantityInStock() - inventory.getQuantityReserved();
-        
+
         Optional<CartItem> existingItemOpt = cartItemRepository.findByCartIdAndProductId(cart.getId(), product.getId());
-        
+
         if (existingItemOpt.isPresent()) {
             CartItem existingItem = existingItemOpt.get();
             int newQuantity = existingItem.getQuantity() + request.getQuantity();
@@ -199,7 +198,8 @@ public class CartServiceImpl implements CartService {
                 throw new AppException(ErrorCode.OUT_OF_STOCK, "Tồn kho không đủ");
             }
             existingItem.setQuantity(newQuantity);
-            existingItem.setPriceSnapshot(product.getSalePrice() != null ? product.getSalePrice() : product.getBasePrice());
+            existingItem
+                    .setPriceSnapshot(product.getSalePrice() != null ? product.getSalePrice() : product.getBasePrice());
             cartItemRepository.save(existingItem);
         } else {
             if (request.getQuantity() > available) {
@@ -213,17 +213,22 @@ public class CartServiceImpl implements CartService {
                     .build();
             cartItemRepository.save(newItem);
         }
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> 8dec280c450dd2f8c0ee500bd71ff4ec25b2ca1a
         return self.getCart();
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public CartDto updateCartItem(Long itemId, UpdateCartItemRequest request) {
         User user = getCurrentUser();
         CartItem item = cartItemRepository.findByIdAndCartUserId(itemId, user.getId())
-                .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thực hiện hành động này hoặc sản phẩm không có trong giỏ"));
-                
+                .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN,
+                        "Bạn không có quyền thực hiện hành động này hoặc sản phẩm không có trong giỏ"));
+
         if (request.getQuantity() < 0) {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Số lượng sản phẩm không được nhỏ hơn 0");
         }
@@ -232,79 +237,84 @@ public class CartServiceImpl implements CartService {
             cartItemRepository.delete(item);
             return self.getCart();
         }
-        
+
         Inventory inventory = inventoryRepository.findByProductIdWithLock(item.getProduct().getId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Không có thông tin tồn kho"));
-                
+
         int available = inventory.getQuantityInStock() - inventory.getQuantityReserved();
         if (request.getQuantity() > available) {
             throw new AppException(ErrorCode.OUT_OF_STOCK, "Tồn kho không đủ");
         }
-        
+
         item.setQuantity(request.getQuantity());
         cartItemRepository.save(item);
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> 8dec280c450dd2f8c0ee500bd71ff4ec25b2ca1a
         return self.getCart();
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public CartDto removeCartItem(Long itemId) {
         User user = getCurrentUser();
         CartItem item = cartItemRepository.findByIdAndCartUserId(itemId, user.getId())
-                .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN, "Bạn không có quyền thực hiện hành động này hoặc sản phẩm không có trong giỏ"));
+                .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN,
+                        "Bạn không có quyền thực hiện hành động này hoặc sản phẩm không có trong giỏ"));
         cartItemRepository.delete(item);
         return self.getCart();
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public CheckoutResponse checkout(CheckoutRequest request) {
         User user = getCurrentUser();
         Cart cart = getOrCreateCart(user);
         List<CartItem> cartItems = cartItemRepository.findByCartId(cart.getId());
-        
+
         if (cartItems.isEmpty()) {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Giỏ hàng trống");
         }
-        
-        return processCheckout(user, cartItems, request.getAddressId(), request.getCarrierId(), 
+
+        return processCheckout(user, cartItems, request.getAddressId(), request.getCarrierId(),
                 request.getPaymentMethod(), request.getDiscountCode(), request.getNote(), cart.getId());
     }
-    
+
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public CheckoutResponse quickCheckout(QuickCheckoutRequest request) {
         User user = getCurrentUser();
-        
+
         if (request.getQuantity() <= 0) {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Số lượng sản phẩm phải lớn hơn 0");
         }
 
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Sản phẩm không tồn tại"));
-                
+
         CartItem mockItem = CartItem.builder()
                 .product(product)
                 .quantity(request.getQuantity())
                 .priceSnapshot(product.getSalePrice() != null ? product.getSalePrice() : product.getBasePrice())
                 .build();
-                
+
         List<CartItem> items = List.of(mockItem);
-        
-        return processCheckout(user, items, request.getAddressId(), request.getCarrierId(), 
+
+        return processCheckout(user, items, request.getAddressId(), request.getCarrierId(),
                 request.getPaymentMethod(), request.getDiscountCode(), null, null);
     }
 
-    private CheckoutResponse processCheckout(User user, List<CartItem> items, Long addressId, Long carrierId, 
-                                             PaymentMethod paymentMethod, String discountCode, String note, Long cartId) {
+    private CheckoutResponse processCheckout(User user, List<CartItem> items, Long addressId, Long carrierId,
+            PaymentMethod paymentMethod, String discountCode, String note, Long cartId) {
         Address address = addressRepository.findById(addressId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Địa chỉ không tồn tại"));
 
         if (!address.getUser().getId().equals(user.getId())) {
             throw new AppException(ErrorCode.FORBIDDEN, "Địa chỉ không thuộc về người dùng");
         }
-                
+
         ShippingCarrier carrier = shippingCarrierRepository.findById(carrierId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Đơn vị vận chuyển không tồn tại"));
 
@@ -324,8 +334,8 @@ public class CartServiceImpl implements CartService {
         }
 
         // 4. Create order
-        Order order = saveOrder(user, address, carrier, appliedDiscount, subtotal, 
-                               discountAmount, shippingFee, grandTotal, paymentMethod, note);
+        Order order = saveOrder(user, address, carrier, appliedDiscount, subtotal,
+                discountAmount, shippingFee, grandTotal, paymentMethod, note);
 
         // 5. Create order items
         saveOrderItems(order, items);
@@ -357,7 +367,8 @@ public class CartServiceImpl implements CartService {
         for (CartItem item : items) {
             Product product = item.getProduct();
             if (product.getStatus() != ProductStatus.ACTIVE) {
-                throw new AppException(ErrorCode.VALIDATION_ERROR, "Sản phẩm " + product.getName() + " ngừng kinh doanh");
+                throw new AppException(ErrorCode.VALIDATION_ERROR,
+                        "Sản phẩm " + product.getName() + " ngừng kinh doanh");
             }
 
             Inventory inventory = inventoryMap.get(product.getId());
@@ -397,12 +408,14 @@ public class CartServiceImpl implements CartService {
 
         BigDecimal discountAmount;
         if (appliedDiscount.getType() == DiscountType.PERCENTAGE) {
-            discountAmount = subtotal.multiply(appliedDiscount.getValue()).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP);
+            discountAmount = subtotal.multiply(appliedDiscount.getValue()).divide(BigDecimal.valueOf(100),
+                    RoundingMode.HALF_UP);
         } else {
             discountAmount = appliedDiscount.getValue();
         }
 
-        if (appliedDiscount.getMaxDiscountAmount() != null && discountAmount.compareTo(appliedDiscount.getMaxDiscountAmount()) > 0) {
+        if (appliedDiscount.getMaxDiscountAmount() != null
+                && discountAmount.compareTo(appliedDiscount.getMaxDiscountAmount()) > 0) {
             discountAmount = appliedDiscount.getMaxDiscountAmount();
         }
 
@@ -413,8 +426,8 @@ public class CartServiceImpl implements CartService {
     }
 
     private Order saveOrder(User user, Address address, ShippingCarrier carrier, Discount discount,
-                             BigDecimal subtotal, BigDecimal discountAmount, BigDecimal shippingFee,
-                             BigDecimal grandTotal, PaymentMethod paymentMethod, String note) {
+            BigDecimal subtotal, BigDecimal discountAmount, BigDecimal shippingFee,
+            BigDecimal grandTotal, PaymentMethod paymentMethod, String note) {
         String orderCode = "ORD-" + System.currentTimeMillis();
         Order order = Order.builder()
                 .orderCode(orderCode)
@@ -480,5 +493,6 @@ public class CartServiceImpl implements CartService {
         return null;
     }
 
-    private record DiscountResult(BigDecimal amount, Discount discount) {}
+    private record DiscountResult(BigDecimal amount, Discount discount) {
+    }
 }
