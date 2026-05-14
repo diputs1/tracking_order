@@ -7,6 +7,4 @@ public interface CartService {
     CartDto addToCart(AddToCartRequest request);
     CartDto updateCartItem(Long itemId, UpdateCartItemRequest request);
     CartDto removeCartItem(Long itemId);
-    CheckoutResponse checkout(CheckoutRequest request);
-    CheckoutResponse quickCheckout(QuickCheckoutRequest request);
 }

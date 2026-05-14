@@ -3,6 +3,7 @@ package com.example.tracking_order.modules.cart.controller;
 import com.example.tracking_order.common.response.ApiResponse;
 import com.example.tracking_order.modules.cart.dto.*;
 import com.example.tracking_order.modules.cart.service.CartService;
+import com.example.tracking_order.modules.cart.service.CheckoutService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 public class CartController {
 
     private final CartService cartService;
+    private final CheckoutService checkoutService;
 
     @GetMapping("/cart")
     public ApiResponse<CartDto> getCart() {
@@ -36,11 +38,11 @@ public class CartController {
 
     @PostMapping("/cart/checkout")
     public ApiResponse<CheckoutResponse> checkout(@Valid @RequestBody CheckoutRequest request) {
-        return ApiResponse.success(cartService.checkout(request));
+        return ApiResponse.success(checkoutService.checkout(request));
     }
 
     @PostMapping("/orders/quick-checkout")
     public ApiResponse<CheckoutResponse> quickCheckout(@Valid @RequestBody QuickCheckoutRequest request) {
-        return ApiResponse.success(cartService.quickCheckout(request));
+        return ApiResponse.success(checkoutService.quickCheckout(request));
     }
 }
