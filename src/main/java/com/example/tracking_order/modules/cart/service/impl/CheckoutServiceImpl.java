@@ -215,6 +215,10 @@ public class CheckoutServiceImpl implements CheckoutService {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Đơn hàng chưa đạt giá trị tối thiểu để áp dụng mã");
         }
 
+        if (appliedDiscount.getMaxUses() != null && appliedDiscount.getUsedCount() >= appliedDiscount.getMaxUses()) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR, "Mã giảm giá đã hết lượt sử dụng");
+        }
+
         BigDecimal discountAmount;
         if (appliedDiscount.getType() == DiscountType.PERCENTAGE) {
             discountAmount = subtotal.multiply(appliedDiscount.getValue()).divide(BigDecimal.valueOf(100),
