@@ -5,7 +5,13 @@ import com.example.tracking_order.common.exception.ErrorCode;
 import com.example.tracking_order.modules.auth.dto.ForgotPasswordRequest;
 import com.example.tracking_order.modules.auth.dto.LoginRequest;
 import com.example.tracking_order.modules.auth.dto.LoginResponse;
+import com.example.tracking_order.modules.auth.dto.TokenRefreshRequest;
+import com.example.tracking_order.modules.auth.dto.TokenRefreshResponse;
+import com.example.tracking_order.modules.auth.entity.RefreshToken;
+import com.example.tracking_order.modules.auth.repository.RefreshTokenRepository;
 import com.example.tracking_order.modules.auth.service.AuthService;
+import com.example.tracking_order.modules.auth.service.RefreshTokenService;
+import com.example.tracking_order.modules.user.entity.User;
 import com.example.tracking_order.modules.user.repository.UserRepository;
 import com.example.tracking_order.security.JwtUtils;
 import com.example.tracking_order.security.UserDetailsImpl;
@@ -28,6 +34,8 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
     private final UserRepository userRepository;
+    private final RefreshTokenService refreshTokenService;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Override
     public LoginResponse login(LoginRequest request) {
@@ -39,7 +47,8 @@ public class AuthServiceImpl implements AuthService {
             UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
             String jwt = jwtUtils.generateJwtToken(authentication);
 
-            String refreshToken = UUID.randomUUID().toString();
+            RefreshToken refreshTokenObj = refreshTokenService.createRefreshToken(userDetails.getId());
+            String refreshToken = refreshTokenObj.getToken();
 
             List<String> roles = userDetails.getAuthorities().stream()
                     .map(GrantedAuthority::getAuthority)
@@ -71,5 +80,26 @@ public class AuthServiceImpl implements AuthService {
         if (!userRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorCode.NOT_FOUND, "Email không tồn tại trong hệ thống");
         }
+    }
+
+    @Override
+    public TokenRefreshResponse refreshToken(TokenRefreshRequest request) {
+        String requestRefreshToken = request.getRefreshToken();
+
+        return refreshTokenRepository.findByToken(requestRefreshToken)
+                .map(refreshTokenService::verifyExpiration)
+                .map(refreshToken -> {
+                    User user = refreshToken.getUser();
+                    
+                    refreshTokenService.deleteByToken(requestRefreshToken);
+                    RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user.getId());
+                    
+                    String token = jwtUtils.generateTokenFromUsername(user.getEmail());
+                    return TokenRefreshResponse.builder()
+                            .accessToken(token)
+                            .refreshToken(newRefreshToken.getToken())
+                            .build();
+                })
+                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED, "Refresh token không tồn tại hoặc đã hết hạn"));
     }
 }
