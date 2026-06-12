@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    container_name: tracking-order-app
+    restart: on-failure
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-primary:3306/tracking_order?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - KAFKA_ENABLED=true
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_TRACES_EXPORTER=otlp
+    depends_on:
+      mysql-primary:
+        condition: service_started
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_started
+      jaeger:
+        condition: service_started

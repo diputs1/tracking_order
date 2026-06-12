@@ -10,7 +10,7 @@ import com.example.tracking_order.modules.order.enums.OrderStatus;
 import com.example.tracking_order.modules.order.repository.OrderRepository;
 import com.example.tracking_order.modules.order.service.OrderService;
 import com.example.tracking_order.modules.order.specification.OrderSpecification;
-import com.example.tracking_order.modules.notification.service.NotificationService;
+import com.example.tracking_order.modules.notification.service.ResilientNotificationService;
 import com.example.tracking_order.modules.notification.enums.NotificationType;
 import com.example.tracking_order.modules.user.entity.User;
 import com.example.tracking_order.modules.user.repository.UserRepository;
@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,7 +41,7 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
-    private final NotificationService notificationService;
+    private final ResilientNotificationService notificationService;
     private final com.example.tracking_order.modules.order.mapper.OrderMapper orderMapper;
 
     @Autowired
@@ -107,7 +108,10 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @LogExecutionTime
-    @CacheEvict(value = "order_details", key = "#orderId")
+    @Caching(evict = {
+            @CacheEvict(value = "order_details", key = "#orderId"),
+            @CacheEvict(value = "orders_list", allEntries = true)
+    })
     public OrderDetailDto updateOrderStatus(Long orderId, OrderStatusUpdateRequest request) {
         User user = getCurrentUser();
         Order order = getOrderWithOwnerCheck(orderId, user);
@@ -138,7 +142,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @CacheEvict(value = "order_details", key = "#orderId")
+    @Caching(evict = {
+            @CacheEvict(value = "order_details", key = "#orderId"),
+            @CacheEvict(value = "orders_list", allEntries = true)
+    })
     public OrderDetailDto requestReturn(Long orderId, ReturnRequestDto request) {
         User user = getCurrentUser();
         Order order = getOrderWithOwnerCheck(orderId, user);

@@ -21,6 +21,7 @@ import com.example.tracking_order.modules.discount.repository.DiscountRepository
 import com.example.tracking_order.modules.order.entity.Order;
 import com.example.tracking_order.modules.order.entity.OrderItem;
 import com.example.tracking_order.modules.order.enums.OrderStatus;
+import com.example.tracking_order.modules.order.event.OrderCreatedApplicationEvent;
 import com.example.tracking_order.modules.order.mapper.OrderMapper;
 import com.example.tracking_order.modules.order.repository.OrderItemRepository;
 import com.example.tracking_order.modules.order.repository.OrderRepository;
@@ -36,6 +37,7 @@ import com.example.tracking_order.modules.user.repository.AddressRepository;
 import com.example.tracking_order.modules.user.repository.UserRepository;
 import com.example.tracking_order.security.UserDetailsImpl;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,6 +65,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
     private final OrderMapper orderMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     private User getCurrentUser() {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication()
@@ -158,6 +161,11 @@ public class CheckoutServiceImpl implements CheckoutService {
         }
 
         String paymentUrl = generatePaymentUrl(order.getOrderCode(), paymentMethod);
+        eventPublisher.publishEvent(new OrderCreatedApplicationEvent(
+                order.getId(),
+                order.getOrderCode(),
+                user.getId(),
+                grandTotal));
         return orderMapper.toCheckoutResponse(order, payment, paymentUrl);
     }
 

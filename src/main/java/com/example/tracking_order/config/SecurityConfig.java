@@ -1,5 +1,7 @@
 package com.example.tracking_order.config;
 
+import com.example.tracking_order.common.filter.IdempotencyFilter;
+import com.example.tracking_order.common.filter.RateLimitingFilter;
 import com.example.tracking_order.security.AuthEntryPointJwt;
 import com.example.tracking_order.security.AuthTokenFilter;
 import com.example.tracking_order.security.UserDetailsServiceImpl;
@@ -28,6 +30,8 @@ public class SecurityConfig {
     private final UserDetailsServiceImpl userDetailsService;
     private final AuthEntryPointJwt unauthorizedHandler;
     private final AuthTokenFilter authTokenFilter;
+    private final RateLimitingFilter rateLimitingFilter;
+    private final IdempotencyFilter idempotencyFilter;
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
@@ -65,7 +69,9 @@ public class SecurityConfig {
                 );
 
         http.authenticationProvider(authenticationProvider());
+        http.addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(idempotencyFilter, AuthTokenFilter.class);
 
         return http.build();
     }
